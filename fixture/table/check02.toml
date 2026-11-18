@@ -1,0 +1,310 @@
+# Check 2, the cache states (plan 5.5 Check 2). Written by hand before the tool exists.
+# Conventions and the four starting states (c2.i to c2.iv): README.md.
+#
+# Each case registers the runs in a fresh store from its starting state. The
+# request is "withdraw A". Cases (i) to (iii) withhold from runs E, D and Y alike.
+# Run K appears in case (iv) only.
+#
+# The reason beside "data-order trace missing" is one of two (plan 3.5): "digest
+# mismatch" for a replay whose digests differ from the recorded ones (case ii), and
+# "no recorded digest" for a run with no recorded digest to compare a replay with
+# (case iii).
+#
+# Every segment of runs E, D and Y is built over two or three shards, so each has
+# all five kinds of index array: three per shard and two for the blend. A segment
+# over one shard would have the three per-shard kinds and no blend arrays; the
+# fixture has none.
+
+# ---------------------------------------------------------------------------------
+# (i) Cache files withheld, settings and seed kept
+# ---------------------------------------------------------------------------------
+
+[[row]]
+id = "c02.i.arrays.E/seg-1"
+question = "Are the index arrays replayed for E/seg-1 byte-identical to the withheld ones?"
+plan = "5.5 Check 2 (i); 3.5 (replay); F3"
+core = true
+given = { state = "c2.i", segment = "E/seg-1" }
+expect = { replayed_arrays = "byte-identical", kinds = ["document_index", "sample_index", "shuffle_index", "dataset_index", "dataset_sample_index"] }
+expect_under = { F3 = { replayed_arrays = "bytes differ", replay = "rejected" } }
+source = "the withheld files: the check compares them with the replayed arrays (on the .npy arrays, or with the replay run at the run's own paths)"
+
+[[row]]
+id = "c02.i.arrays.E/seg-2"
+question = "Are the index arrays replayed for E/seg-2 byte-identical to the withheld ones?"
+plan = "5.5 Check 2 (i); 3.5 (replay); F3"
+core = true
+given = { state = "c2.i", segment = "E/seg-2" }
+expect = { replayed_arrays = "byte-identical", kinds = ["document_index", "sample_index", "shuffle_index", "dataset_index", "dataset_sample_index"] }
+expect_under = { F3 = { replayed_arrays = "bytes differ", replay = "rejected" } }
+source = "the withheld files: the check compares them with the replayed arrays"
+
+[[row]]
+id = "c02.i.arrays.D/seg-1"
+question = "Are the index arrays replayed for D/seg-1 byte-identical to the withheld ones?"
+plan = "5.5 Check 2 (i); 3.5 (replay); F3"
+core = true
+given = { state = "c2.i", segment = "D/seg-1" }
+expect = { replayed_arrays = "byte-identical", kinds = ["document_index", "sample_index", "shuffle_index", "dataset_index", "dataset_sample_index"] }
+expect_under = { F3 = { replayed_arrays = "bytes differ", replay = "rejected" } }
+source = "the withheld files: the check compares them with the replayed arrays"
+
+[[row]]
+id = "c02.i.arrays.Y/seg-1"
+question = "Are the index arrays replayed for Y/seg-1 byte-identical to the withheld ones?"
+plan = "5.5 Check 2 (i); 3.5 (replay); F3"
+core = true
+given = { state = "c2.i", segment = "Y/seg-1" }
+expect = { replayed_arrays = "byte-identical", kinds = ["document_index", "sample_index", "shuffle_index", "dataset_index", "dataset_sample_index"] }
+expect_under = { F3 = { replayed_arrays = "bytes differ", replay = "rejected" } }
+source = "the withheld files: the check compares them with the replayed arrays"
+
+[[row]]
+id = "c02.i.E@6"
+question = "With the caches replayed, does checkpoint 6 answer as in Check 8?"
+plan = "5.5 Check 2 (i); Check 8; 2.4; 3.5"
+core = true
+given = { request = "withdraw A", artifact = "E@6", state = "c2.i" }
+expect = { answer = "does not contain" }
+expect_under = { F3 = { answer = "may contain", names = "data-order trace missing", names_detail = "digest mismatch" } }
+source = "hand-written table: a replay whose digests equal the recorded ones counts, so the answer is that of c08.withdraw-A.E@6; if F3 is disproved the answer becomes that of case (ii)"
+
+[[row]]
+id = "c02.i.E@9"
+question = "With the caches replayed, does checkpoint 9 answer as in Check 8?"
+plan = "5.5 Check 2 (i); Check 8; 2.4; 3.5"
+core = true
+given = { request = "withdraw A", artifact = "E@9", state = "c2.i" }
+expect = { answer = "contains", basis = "whole-sample read assumed (F9, L9)", first_exposure = { segment = "E/seg-2", step = 7 }, untraced_steps = [["E/seg-2", 8]] }
+expect_under = { F3 = { answer = "may contain", names = "data-order trace missing", names_detail = "digest mismatch" } }
+source = "hand-written table: the answer of c08.withdraw-A.E@9; the step record still lowers step 8; if F3 is disproved the answer becomes that of case (ii)"
+
+[[row]]
+id = "c02.i.D@3"
+question = "With the caches replayed, does descendant D answer as in Check 8?"
+plan = "5.5 Check 2 (i); Check 8; 2.4; 3.5"
+core = true
+given = { request = "withdraw A", artifact = "D@3", state = "c2.i" }
+expect = { answer = "contains", basis = "whole-sample read assumed (F9, L9)" }
+expect_under = { F3 = { answer = "may contain", names = "data-order trace missing", names_detail = "digest mismatch" } }
+source = "hand-written table: the answer of c08.withdraw-A.D@3; if F3 is disproved the answer becomes that of case (ii)"
+
+[[row]]
+id = "c02.i.Y@6"
+question = "With the caches replayed, does branch Y answer as in Check 8?"
+plan = "5.5 Check 2 (i); Check 8; 2.4; 3.5"
+core = true
+given = { request = "withdraw A", artifact = "Y@6", state = "c2.i" }
+expect = { answer = "does not contain" }
+expect_under = { F3 = { answer = "may contain", names = "data-order trace missing", names_detail = "digest mismatch" } }
+source = "hand-written table: the answer of c08.withdraw-A.Y@6; if F3 is disproved the answer becomes that of case (ii)"
+
+# ---------------------------------------------------------------------------------
+# (ii) Cache files withheld, the seed in the settings changed
+# ---------------------------------------------------------------------------------
+
+[[row]]
+id = "c02.ii.replay-rejected"
+question = "Do the replayed files' digests differ from the digests recorded at training time, and is the replay rejected for that difference?"
+plan = "5.5 Check 2 (ii); 3.5 (a replay counts only when its digests equal the recorded ones)"
+core = true
+given = { state = "c2.ii", segments = ["E/seg-1", "E/seg-2", "D/seg-1", "Y/seg-1"] }
+expect = { digests = "differ from the recorded ones", replay = "rejected", reason = "digest mismatch" }
+source = "hand-written table: a different seed gives different shuffles, so the replayed arrays cannot equal the recorded digests; the recorded digests are those of the run record the replica wrote, a source outside the tool"
+
+[[row]]
+id = "c02.ii.E@6"
+question = "With the replay rejected, what does checkpoint 6 answer?"
+plan = "5.5 Check 2 (ii); 2.4; 3.5; Decision 12"
+core = true
+given = { request = "withdraw A", artifact = "E@6", state = "c2.ii" }
+expect = { answer = "may contain", names = "data-order trace missing", names_detail = "digest mismatch" }
+source = "hand-written table: no step of its history has a trace; a clean mixture does not replace a trace (Decision 12)"
+
+[[row]]
+id = "c02.ii.E@9"
+question = "With the replay rejected, what does checkpoint 9 answer?"
+plan = "5.5 Check 2 (ii); 2.4; 3.5"
+core = true
+given = { request = "withdraw A", artifact = "E@9", state = "c2.ii" }
+expect = { answer = "may contain", names = "data-order trace missing", names_detail = "digest mismatch" }
+source = "hand-written table: with no trace nothing shows T consumed, so there is no recorded \"contains\" to win; T being in the mixture is not consumption (2.4)"
+
+[[row]]
+id = "c02.ii.D@3"
+question = "With the replay rejected, what does descendant D answer, and does it name its own missing trace?"
+plan = "5.5 Check 2 (ii) (each its own missing trace, D's and Y's included); 2.4"
+core = true
+given = { request = "withdraw A", artifact = "D@3", state = "c2.ii" }
+expect = { answer = "may contain", names = "data-order trace missing", names_detail = "digest mismatch" }
+source = "hand-written table: D's own caches are withheld and its replay is rejected too, so D names a missing data-order trace and not only its ancestor"
+
+[[row]]
+id = "c02.ii.Y@6"
+question = "With the replay rejected, what does branch Y answer, and does it name its own missing trace?"
+plan = "5.5 Check 2 (ii) (each its own missing trace, D's and Y's included); 2.4"
+core = true
+given = { request = "withdraw A", artifact = "Y@6", state = "c2.ii" }
+expect = { answer = "may contain", names = "data-order trace missing", names_detail = "digest mismatch" }
+source = "hand-written table: Y's own caches are withheld and its replay is rejected too"
+
+[[row]]
+id = "c02.ii.E/mix-1"
+question = "With the replay rejected, does the answer of E/mix-1 stand?"
+plan = "5.5 Check 2 (ii) (the mixture answer stands); 2.2"
+core = true
+given = { request = "withdraw A", artifact = "E/mix-1", state = "c2.ii" }
+expect = { answer = "does not contain" }
+source = "hand-written table: a mixture is answered from its snapshot and shards; no trace is in its closure"
+
+[[row]]
+id = "c02.ii.E/mix-2"
+question = "With the replay rejected, does the answer of E/mix-2 stand?"
+plan = "5.5 Check 2 (ii) (the mixture answer stands); 2.1"
+core = true
+given = { request = "withdraw A", artifact = "E/mix-2", state = "c2.ii" }
+expect = { answer = "contains" }
+source = "hand-written table: a mixture is answered from its snapshot and shards; it holds shard 3 and T"
+
+[[row]]
+id = "c02.ii.D/mix-1"
+question = "With the replay rejected, does the answer of D/mix-1 stand?"
+plan = "5.5 Check 2 (ii) (the mixture answer stands); 2.2"
+core = true
+given = { request = "withdraw A", artifact = "D/mix-1", state = "c2.ii" }
+expect = { answer = "does not contain" }
+source = "hand-written table: a mixture is answered from its snapshot and shards"
+
+[[row]]
+id = "c02.ii.Y/mix-1"
+question = "With the replay rejected, does the answer of Y/mix-1 stand?"
+plan = "5.5 Check 2 (ii) (the mixture answer stands); 2.1"
+core = true
+given = { request = "withdraw A", artifact = "Y/mix-1", state = "c2.ii" }
+expect = { answer = "contains" }
+source = "hand-written table: a mixture is answered from its snapshot and shards; it holds shard 3 and T"
+
+# ---------------------------------------------------------------------------------
+# (iii) Cache files, settings and recorded digests withheld
+# ---------------------------------------------------------------------------------
+
+[[row]]
+id = "c02.iii.no-replay"
+question = "Is no replay attempted?"
+plan = "5.5 Check 2 (iii); 3.5"
+core = true
+given = { state = "c2.iii", segments = ["E/seg-1", "E/seg-2", "D/seg-1", "Y/seg-1"] }
+expect = { replay = "not attempted", reason = "no recorded digest" }
+source = "hand-written table: without settings there is nothing to replay from, and without recorded digests a replay would support no answer (3.5)"
+
+[[row]]
+id = "c02.iii.E@6"
+question = "With nothing to replay from, what does checkpoint 6 answer?"
+plan = "5.5 Check 2 (iii) (the answers are those of (ii)); 2.4; 3.5"
+core = true
+given = { request = "withdraw A", artifact = "E@6", state = "c2.iii" }
+expect = { answer = "may contain", names = "data-order trace missing", names_detail = "no recorded digest" }
+source = "hand-written table: the answer and the named cause are those of case (ii); the reason beside the cause is \"no recorded digest\", the one of plan 3.5's two reasons that holds when the run's recorded digests are not there: no replay could count, whatever else is withheld"
+
+[[row]]
+id = "c02.iii.E@9"
+question = "With nothing to replay from, what does checkpoint 9 answer?"
+plan = "5.5 Check 2 (iii); 2.4; 3.5"
+core = true
+given = { request = "withdraw A", artifact = "E@9", state = "c2.iii" }
+expect = { answer = "may contain", names = "data-order trace missing", names_detail = "no recorded digest" }
+source = "hand-written table: as case (ii), with the reason \"no recorded digest\" (plan 3.5); nothing shows T consumed"
+
+[[row]]
+id = "c02.iii.D@3"
+question = "With nothing to replay from, what does descendant D answer?"
+plan = "5.5 Check 2 (iii); 2.4; 3.5"
+core = true
+given = { request = "withdraw A", artifact = "D@3", state = "c2.iii" }
+expect = { answer = "may contain", names = "data-order trace missing", names_detail = "no recorded digest" }
+source = "hand-written table: as case (ii), with the reason \"no recorded digest\" (plan 3.5); D names its own missing trace"
+
+[[row]]
+id = "c02.iii.Y@6"
+question = "With nothing to replay from, what does branch Y answer?"
+plan = "5.5 Check 2 (iii); 2.4; 3.5"
+core = true
+given = { request = "withdraw A", artifact = "Y@6", state = "c2.iii" }
+expect = { answer = "may contain", names = "data-order trace missing", names_detail = "no recorded digest" }
+source = "hand-written table: as case (ii), with the reason \"no recorded digest\" (plan 3.5); Y names its own missing trace"
+
+[[row]]
+id = "c02.iii.E/mix-1"
+question = "With nothing to replay from, does the answer of E/mix-1 stand?"
+plan = "5.5 Check 2 (iii); 2.2"
+core = true
+given = { request = "withdraw A", artifact = "E/mix-1", state = "c2.iii" }
+expect = { answer = "does not contain" }
+source = "hand-written table: as case (ii); the mixture snapshot is kept"
+
+[[row]]
+id = "c02.iii.E/mix-2"
+question = "With nothing to replay from, does the answer of E/mix-2 stand?"
+plan = "5.5 Check 2 (iii); 2.1"
+core = true
+given = { request = "withdraw A", artifact = "E/mix-2", state = "c2.iii" }
+expect = { answer = "contains" }
+source = "hand-written table: as case (ii); the mixture snapshot is kept"
+
+[[row]]
+id = "c02.iii.D/mix-1"
+question = "With nothing to replay from, does the answer of D/mix-1 stand?"
+plan = "5.5 Check 2 (iii); 2.2"
+core = true
+given = { request = "withdraw A", artifact = "D/mix-1", state = "c2.iii" }
+expect = { answer = "does not contain" }
+source = "hand-written table: as case (ii); the mixture snapshot is kept"
+
+[[row]]
+id = "c02.iii.Y/mix-1"
+question = "With nothing to replay from, does the answer of Y/mix-1 stand?"
+plan = "5.5 Check 2 (iii); 2.1"
+core = true
+given = { request = "withdraw A", artifact = "Y/mix-1", state = "c2.iii" }
+expect = { answer = "contains" }
+source = "hand-written table: as case (ii); the mixture snapshot is kept"
+
+# ---------------------------------------------------------------------------------
+# (iv) Run K: cache files kept, shuffle digests removed from its run record
+# ---------------------------------------------------------------------------------
+
+[[row]]
+id = "c02.iv.K@3"
+question = "With the shuffle digests removed from run K's run record, what does K@3 answer?"
+plan = "5.5 Check 2 (iv); 3.5 (the order of a cyclic run); 2.4"
+core = true
+given = { request = "withdraw A", artifact = "K@3", state = "c2.iv" }
+expect = { answer = "may contain", names = "cyclic order not recorded" }
+source = "hand-written table: the shuffle of a cyclic run is in no file, so kept caches do not give its order; with no recorded digest the checkpoint answers \"may contain\", and its unmutated \"does not contain\" is lost"
+
+[[row]]
+id = "c02.iv.K@8"
+question = "With the shuffle digests removed from run K's run record, what does K@8 answer?"
+plan = "5.5 Check 2 (iv); 3.5; 2.4 (a shuffle with no matching recorded digest)"
+core = true
+given = { request = "withdraw A", artifact = "K@8", state = "c2.iv" }
+expect = { answer = "may contain", names = "cyclic order not recorded" }
+source = "hand-written table: no \"contains\" rests on an order that is not verified (2.4), so the unmutated \"contains\" is lost too"
+
+[[row]]
+id = "c02.iv.K@40"
+question = "With the shuffle digests removed from run K's run record, what does K@40 answer?"
+plan = "5.5 Check 2 (iv); 3.5; 2.4"
+core = true
+given = { request = "withdraw A", artifact = "K@40", state = "c2.iv" }
+expect = { answer = "may contain", names = "cyclic order not recorded" }
+source = "hand-written table: as K@8"
+
+[[row]]
+id = "c02.iv.K/mix-1"
+question = "With the shuffle digests removed from run K's run record, does the answer of K/mix-1 stand?"
+plan = "5.5 Check 2 (iv); 2.1"
+core = true
+given = { request = "withdraw A", artifact = "K/mix-1", state = "c2.iv" }
+expect = { answer = "contains" }
+source = "hand-written table: a mixture is answered from its snapshot and shards; it holds shard 3 and T"

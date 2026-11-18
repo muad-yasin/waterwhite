@@ -1,0 +1,2126 @@
+# Check 5, the coverage gate (plan 5.5 Check 5). Written by hand before the tool exists.
+# Conventions, requests, stores, handles and the fault catalogue: README.md.
+#
+# Blocks, in order:
+#   A. "withdraw A", unmutated: every artifact of the main store and of the rr store.
+#   B. one block per single fault: every artifact of the main store.
+#   C. the record-level request about B, "withdraw C" and its faults, the harness,
+#      the unregistered checkpoint, the listing.
+
+# ==================================================================================
+# A. "withdraw A", unmutated
+# ==================================================================================
+
+[[row]]
+id = "c05.unmutated.src/A"
+question = "Under withdraw A, what does the source file of A answer?"
+plan = "5.5 Check 5; 2.1; 2.3"
+core = true
+given = { request = "withdraw A", artifact = "src/A", state = "unmutated" }
+expect = { answer = "contains", notes = [] }
+source = "hand-written table: the records of a member of the withdrawn source are the source's own records (2.3)"
+
+[[row]]
+id = "c05.unmutated.src/B"
+question = "Under withdraw A, what does the source file of B answer?"
+plan = "5.5 Check 5; 2.2; 2.3; L12"
+core = true
+given = { request = "withdraw A", artifact = "src/B", state = "unmutated" }
+expect = { answer = "does not contain", notes = [], scope = { source = "A", members = ["A/r1"] } }
+source = "hand-written table: every record is ingested under B/r1; X@B has the text of X but arrived under another source, which lies outside a withdrawal (2.3, L12)"
+
+[[row]]
+id = "c05.unmutated.src/C"
+question = "Under withdraw A, what does the source file of C answer?"
+plan = "5.5 Check 5; 2.2; 2.3"
+core = true
+given = { request = "withdraw A", artifact = "src/C", state = "unmutated" }
+expect = { answer = "does not contain", notes = [] }
+source = "hand-written table: every record is ingested under C/r1 and nothing in the file is derived"
+
+[[row]]
+id = "c05.unmutated.src/Z"
+question = "Under withdraw A, what does the source file of Z answer?"
+plan = "5.5 Check 5; 2.2; 5.1"
+core = true
+given = { request = "withdraw A", artifact = "src/Z", state = "unmutated" }
+expect = { answer = "does not contain", notes = [] }
+source = "hand-written table: every record is ingested under Z/r1; nothing is derived from or into Z (5.1)"
+
+[[row]]
+id = "c05.unmutated.gen/P"
+question = "Under withdraw A, what does the generation output that holds P answer?"
+plan = "5.5 Check 5; 2.1; 5.1; Decision 25"
+core = true
+given = { request = "withdraw A", artifact = "gen/P", state = "unmutated" }
+expect = { answer = "contains", chain = ["gen/P:P", "src/A:X@A"], notes = ["the parent list is process evidence (what the harness handed the job and what the output states it used), not proof that the output depends on the source"] }
+source = "hand-written table: P states it used X@A (5.1); the chain passes a generation edge, so the answer adds the process-evidence note (2.1)"
+
+[[row]]
+id = "c05.unmutated.gen/T"
+question = "Under withdraw A, what does the generation output that holds T answer?"
+plan = "5.5 Check 5; 2.1; 5.1; Decision 25"
+core = true
+given = { request = "withdraw A", artifact = "gen/T", state = "unmutated" }
+expect = { answer = "contains", chain = ["gen/T:T", "gen/P:P", "src/A:X@A"], notes = ["the parent list is process evidence (what the harness handed the job and what the output states it used), not proof that the output depends on the source"] }
+source = "hand-written table: T states it used P, and P states it used X@A (5.1)"
+
+[[row]]
+id = "c05.unmutated.gen/S"
+question = "Under withdraw A, what does the generation output that holds S answer?"
+plan = "5.5 Check 5; 2.1; 3.1 (parent mode all); 5.1"
+core = true
+given = { request = "withdraw A", artifact = "gen/S", state = "unmutated" }
+expect = { answer = "contains", chain = ["gen/S:S", "src/A:SA"], notes = ["the parent list is process evidence (what the harness handed the job and what the output states it used), not proof that the output depends on the source"] }
+source = "hand-written table: S states it used SA and SC, parent mode all; one parent of an all edge in scope puts the child in scope (3.1, 4.1)"
+
+[[row]]
+id = "c05.unmutated.R1"
+question = "Under withdraw A, what does release R1 answer?"
+plan = "5.5 Check 5; 2.1; 5.1"
+core = true
+given = { request = "withdraw A", artifact = "R1", state = "unmutated" }
+expect = { answer = "contains", notes = ["the parent list is process evidence (what the harness handed the job and what the output states it used), not proof that the output depends on the source"] }
+source = "hand-written table: R1 holds X with A's copy selected, and P, T and S (5.1); the chains of P, T and S pass generation edges (2.1)"
+
+[[row]]
+id = "c05.unmutated.R2"
+question = "Under withdraw A, what does release R2 answer?"
+plan = "5.5 Check 5; 2.2; 2.3; L12"
+core = true
+given = { request = "withdraw A", artifact = "R2", state = "unmutated" }
+expect = { answer = "does not contain", notes = [], scope = { source = "A", members = ["A/r1"] } }
+source = "hand-written table: R2 is built from B's and Z's records only (5.1); every row has an observed chain to B/r1 or Z/r1 and no generation edge lies in its ancestry"
+
+[[row]]
+id = "c05.unmutated.E/shard-1"
+question = "Under withdraw A, what does shard 1 of run E answer?"
+plan = "5.5 Check 5; 2.2; 5.1; L12"
+core = true
+given = { request = "withdraw A", artifact = "E/shard-1", state = "unmutated" }
+expect = { answer = "does not contain", notes = [] }
+source = "hand-written table: shard 1 holds B's and Z's records only (5.1); its map is whole and every document has a chain to B/r1 or Z/r1; X@B is B's copy (L12)"
+
+[[row]]
+id = "c05.unmutated.E/shard-2"
+question = "Under withdraw A, what does shard 2 of run E answer?"
+plan = "5.5 Check 5; 2.2; 5.1"
+core = true
+given = { request = "withdraw A", artifact = "E/shard-2", state = "unmutated" }
+expect = { answer = "does not contain", notes = [] }
+source = "hand-written table: shard 2 holds B's and Z's records only (5.1); the skipped line is a drop and is no document of the shard"
+
+[[row]]
+id = "c05.unmutated.E/shard-3"
+question = "Under withdraw A, what does shard 3 of run E answer?"
+plan = "5.5 Check 5; 2.1; 5.1"
+core = true
+given = { request = "withdraw A", artifact = "E/shard-3", state = "unmutated" }
+expect = { answer = "contains", chain = ["E/shard-3:T", "gen/T:T", "gen/P:P", "src/A:X@A"], notes = ["the parent list is process evidence (what the harness handed the job and what the output states it used), not proof that the output depends on the source"] }
+source = "hand-written table: shard 3 holds T (5.1), and T runs through P to X@A"
+
+[[row]]
+id = "c05.unmutated.E/mix-1"
+question = "Under withdraw A, what does the mixture of segment 1 of run E answer?"
+plan = "5.5 Check 5; 2.2; 5.1"
+core = true
+given = { request = "withdraw A", artifact = "E/mix-1", state = "unmutated" }
+expect = { answer = "does not contain", notes = [] }
+source = "hand-written table: its snapshot names shards 1 and 2, and both answer \"does not contain\""
+
+[[row]]
+id = "c05.unmutated.E/mix-2"
+question = "Under withdraw A, what does the mixture of segment 2 of run E answer?"
+plan = "5.5 Check 5; 2.1; 5.1"
+core = true
+given = { request = "withdraw A", artifact = "E/mix-2", state = "unmutated" }
+expect = { answer = "contains", notes = ["the parent list is process evidence (what the harness handed the job and what the output states it used), not proof that the output depends on the source"] }
+source = "hand-written table: its snapshot names shard 3, which holds T"
+
+[[row]]
+id = "c05.unmutated.D/mix-1"
+question = "Under withdraw A, what does the mixture of run D answer?"
+plan = "5.5 Check 5; 2.2; 5.1"
+core = true
+given = { request = "withdraw A", artifact = "D/mix-1", state = "unmutated" }
+expect = { answer = "does not contain", notes = [] }
+source = "hand-written table: its snapshot names shards 1 and 2 only (5.1)"
+
+[[row]]
+id = "c05.unmutated.Y/mix-1"
+question = "Under withdraw A, what does the mixture of run Y answer?"
+plan = "5.5 Check 5; 2.1; 5.1"
+core = true
+given = { request = "withdraw A", artifact = "Y/mix-1", state = "unmutated" }
+expect = { answer = "contains", notes = ["the parent list is process evidence (what the harness handed the job and what the output states it used), not proof that the output depends on the source"] }
+source = "hand-written table: Y's mixture holds T (5.1), whatever Y's steps read"
+
+[[row]]
+id = "c05.unmutated.K/mix-1"
+question = "Under withdraw A, what does the mixture of run K answer?"
+plan = "5.5 Check 5; 2.1; 5.1"
+core = true
+given = { request = "withdraw A", artifact = "K/mix-1", state = "unmutated" }
+expect = { answer = "contains", notes = ["the parent list is process evidence (what the harness handed the job and what the output states it used), not proof that the output depends on the source"] }
+source = "hand-written table: the spec gives run K shards 3 and 2; shard 3 holds T"
+
+[[row]]
+id = "c05.unmutated.E@6"
+question = "Under withdraw A, what does checkpoint 6 of run E answer?"
+plan = "5.5 Check 5; Check 8; 2.4"
+core = true
+given = { request = "withdraw A", artifact = "E@6", state = "unmutated" }
+expect = { answer = "does not contain", notes = [], scope = { source = "A", members = ["A/r1"], steps = [["E/seg-1", 1, 6]] } }
+source = "hand-written table: steps 1 to 6 are completely traced and read shards 1 and 2 only (search condition 5)"
+
+[[row]]
+id = "c05.unmutated.E@9"
+question = "Under withdraw A, what does checkpoint 9 of run E answer?"
+plan = "5.5 Check 5; Check 8; 2.4; Decision 20"
+core = true
+given = { request = "withdraw A", artifact = "E@9", state = "unmutated" }
+expect = { answer = "contains", basis = "whole-sample read assumed (F9, L9)", first_exposure = { segment = "E/seg-2", step = 7 }, untraced_steps = [["E/seg-2", 8]] }
+source = "hand-written table: T is consumed at step 7, which is fully traced (search condition 4); step 8 is untraced and is listed beside the chain (2.4)"
+
+[[row]]
+id = "c05.unmutated.D@3"
+question = "Under withdraw A, what does the checkpoint of descendant D answer?"
+plan = "5.5 Check 5; Check 8; 2.4"
+core = true
+given = { request = "withdraw A", artifact = "D@3", state = "unmutated" }
+expect = { answer = "contains", basis = "whole-sample read assumed (F9, L9)", first_exposure = { segment = "E/seg-2", step = 7 }, untraced_steps = [["E/seg-2", 8]] }
+source = "hand-written table: D starts from E@9, which answers \"contains\"; the basis passes down (2.4)"
+
+[[row]]
+id = "c05.unmutated.Y@6"
+question = "Under withdraw A, what does the checkpoint of branch Y answer?"
+plan = "5.5 Check 5; Check 8; 2.4"
+core = true
+given = { request = "withdraw A", artifact = "Y@6", state = "unmutated" }
+expect = { answer = "does not contain", scope = { source = "A", members = ["A/r1"], steps = [["E/seg-1", 1, 6], ["Y/seg-1", 1, 6]] } }
+source = "hand-written table: Y's mixture holds T, but none of its six steps reads it (search condition 14), and its history through E@6 is completely traced"
+
+[[row]]
+id = "c05.unmutated.K@3"
+question = "Under withdraw A, what does checkpoint 3 of run K answer?"
+plan = "5.5 Check 5; Check 8; 2.4; 3.5"
+core = true
+given = { request = "withdraw A", artifact = "K@3", state = "unmutated" }
+expect = { answer = "does not contain" }
+expect_under = { cyclic-wrapper-route = { answer = "may contain", names = "cyclic order not recorded" } }
+source = "hand-written table: K starts from E@6; its steps 1 to 3 are completely traced with matching shuffle digests and read no token of T (search condition 22)"
+
+[[row]]
+id = "c05.unmutated.K@8"
+question = "Under withdraw A, what does checkpoint 8 of run K answer?"
+plan = "5.5 Check 5; Check 8; 2.4; 3.5"
+core = true
+given = { request = "withdraw A", artifact = "K@8", state = "unmutated" }
+expect = { answer = "contains", basis = "whole-sample read assumed (F9, L9)", first_exposure = { segment = "K/seg-1", step = "pending:positions.K.first_read_of_T.step" }, untraced_steps = [] }
+expect_under = { cyclic-wrapper-route = { answer = "may contain", names = "cyclic order not recorded" } }
+source = "hand-written table: the first read of T is at step 7 or 8 (search condition 22); the step number itself is the oracle's log"
+
+[[row]]
+id = "c05.unmutated.K@40"
+question = "Under withdraw A, what does checkpoint 40 of run K answer?"
+plan = "5.5 Check 5; Check 8; 2.4; 3.5"
+core = true
+given = { request = "withdraw A", artifact = "K@40", state = "unmutated" }
+expect = { answer = "contains", basis = "whole-sample read assumed (F9, L9)", first_exposure = { segment = "K/seg-1", step = "pending:positions.K.first_read_of_T.step" }, untraced_steps = [] }
+expect_under = { cyclic-wrapper-route = { answer = "may contain", names = "cyclic order not recorded" } }
+source = "hand-written table: its history holds the step that read T (search condition 22)"
+
+# The round-robin store (run E rebuilt in three round-robin chunks, Check 1).
+
+[[row]]
+id = "c05.unmutated.E-rr/shard-1"
+question = "Under withdraw A, what does round-robin shard 1 answer?"
+plan = "5.5 Check 5; 5.2; 4.5; 2.2"
+core = true
+given = { store = "rr", request = "withdraw A", artifact = "E-rr/shard-1", state = "unmutated" }
+expect = { answer = "does not contain" }
+source = "the replica's records: the manifest of chunk 1 holds no record derived from A (search condition 16); then hand-written table: the proof of 2.2 holds"
+
+[[row]]
+id = "c05.unmutated.E-rr/shard-2"
+question = "Under withdraw A, what does round-robin shard 2 answer?"
+plan = "5.5 Check 5; 5.2; 4.5; 2.2"
+core = true
+given = { store = "rr", request = "withdraw A", artifact = "E-rr/shard-2", state = "unmutated" }
+expect = { answer = "does not contain" }
+source = "the replica's records: the manifest of chunk 2 holds no record derived from A (search condition 16); then hand-written table: the proof of 2.2 holds"
+
+[[row]]
+id = "c05.unmutated.E-rr/shard-3"
+question = "Under withdraw A, what does round-robin shard 3 answer?"
+plan = "5.5 Check 5; 5.2; 4.5; 2.1"
+core = true
+given = { store = "rr", request = "withdraw A", artifact = "E-rr/shard-3", state = "unmutated" }
+expect = { answer = "contains" }
+source = "the replica's records: the manifest of chunk 3 holds T (search condition 16); then hand-written table: T runs through P to X@A"
+
+[[row]]
+id = "c05.unmutated.E-rr/mix-1"
+question = "Under withdraw A, what does the round-robin mixture of segment 1 answer?"
+plan = "5.5 Check 5; 5.2; 4.5; 2.2"
+core = true
+given = { store = "rr", request = "withdraw A", artifact = "E-rr/mix-1", state = "unmutated" }
+expect = { answer = "does not contain" }
+source = "the replica's records: search condition 16; then hand-written table: its snapshot names round-robin shards 1 and 2"
+
+[[row]]
+id = "c05.unmutated.E-rr/mix-2"
+question = "Under withdraw A, what does the round-robin mixture of segment 2 answer?"
+plan = "5.5 Check 5; 5.2; 4.5; 2.1"
+core = true
+given = { store = "rr", request = "withdraw A", artifact = "E-rr/mix-2", state = "unmutated" }
+expect = { answer = "contains" }
+source = "the replica's records: search condition 16; then hand-written table: its snapshot names round-robin shard 3, which holds T"
+
+# ==================================================================================
+# B1. Fault f.trace-deleted: the trace of step 3 of E/seg-1 is deleted.
+# A step trace lies in the history of a checkpoint and in no other artifact's
+# ancestor closure. Every checkpoint of the fixture descends from E/seg-1.
+# ==================================================================================
+
+[[row]]
+id = "c05.f.trace-deleted.src/A"
+question = "With the trace of step 3 deleted, what does src/A answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "src/A", state = "f.trace-deleted" }
+expect = { answer = "contains" }
+source = "hand-written table: a step trace is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.trace-deleted.src/B"
+question = "With the trace of step 3 deleted, what does src/B answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "src/B", state = "f.trace-deleted" }
+expect = { answer = "does not contain" }
+source = "hand-written table: a step trace is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.trace-deleted.src/C"
+question = "With the trace of step 3 deleted, what does src/C answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "src/C", state = "f.trace-deleted" }
+expect = { answer = "does not contain" }
+source = "hand-written table: a step trace is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.trace-deleted.src/Z"
+question = "With the trace of step 3 deleted, what does src/Z answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "src/Z", state = "f.trace-deleted" }
+expect = { answer = "does not contain" }
+source = "hand-written table: a step trace is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.trace-deleted.gen/P"
+question = "With the trace of step 3 deleted, what does gen/P answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "gen/P", state = "f.trace-deleted" }
+expect = { answer = "contains" }
+source = "hand-written table: a step trace is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.trace-deleted.gen/T"
+question = "With the trace of step 3 deleted, what does gen/T answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "gen/T", state = "f.trace-deleted" }
+expect = { answer = "contains" }
+source = "hand-written table: a step trace is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.trace-deleted.gen/S"
+question = "With the trace of step 3 deleted, what does gen/S answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "gen/S", state = "f.trace-deleted" }
+expect = { answer = "contains" }
+source = "hand-written table: a step trace is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.trace-deleted.R1"
+question = "With the trace of step 3 deleted, what does R1 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "R1", state = "f.trace-deleted" }
+expect = { answer = "contains" }
+source = "hand-written table: a step trace is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.trace-deleted.R2"
+question = "With the trace of step 3 deleted, what does R2 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "R2", state = "f.trace-deleted" }
+expect = { answer = "does not contain" }
+source = "hand-written table: a step trace is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.trace-deleted.E/shard-1"
+question = "With the trace of step 3 deleted, what does E/shard-1 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "E/shard-1", state = "f.trace-deleted" }
+expect = { answer = "does not contain" }
+source = "hand-written table: a step trace is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.trace-deleted.E/shard-2"
+question = "With the trace of step 3 deleted, what does E/shard-2 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "E/shard-2", state = "f.trace-deleted" }
+expect = { answer = "does not contain" }
+source = "hand-written table: a step trace is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.trace-deleted.E/shard-3"
+question = "With the trace of step 3 deleted, what does E/shard-3 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "E/shard-3", state = "f.trace-deleted" }
+expect = { answer = "contains" }
+source = "hand-written table: a step trace is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.trace-deleted.E/mix-1"
+question = "With the trace of step 3 deleted, what does E/mix-1 answer under withdraw A?"
+plan = "5.5 Check 5 (the mixture answer stands); 2.2"
+core = true
+given = { request = "withdraw A", artifact = "E/mix-1", state = "f.trace-deleted" }
+expect = { answer = "does not contain" }
+source = "hand-written table: a mixture is answered from its snapshot and shards, not from the traces of a run that used it"
+
+[[row]]
+id = "c05.f.trace-deleted.E/mix-2"
+question = "With the trace of step 3 deleted, what does E/mix-2 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "E/mix-2", state = "f.trace-deleted" }
+expect = { answer = "contains" }
+source = "hand-written table: a mixture is answered from its snapshot and shards, not from the traces of a run that used it"
+
+[[row]]
+id = "c05.f.trace-deleted.D/mix-1"
+question = "With the trace of step 3 deleted, what does D/mix-1 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "D/mix-1", state = "f.trace-deleted" }
+expect = { answer = "does not contain" }
+source = "hand-written table: a mixture is answered from its snapshot and shards, not from the traces of a run that used it"
+
+[[row]]
+id = "c05.f.trace-deleted.Y/mix-1"
+question = "With the trace of step 3 deleted, what does Y/mix-1 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "Y/mix-1", state = "f.trace-deleted" }
+expect = { answer = "contains" }
+source = "hand-written table: a mixture is answered from its snapshot and shards, not from the traces of a run that used it"
+
+[[row]]
+id = "c05.f.trace-deleted.K/mix-1"
+question = "With the trace of step 3 deleted, what does K/mix-1 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "K/mix-1", state = "f.trace-deleted" }
+expect = { answer = "contains" }
+source = "hand-written table: a mixture is answered from its snapshot and shards, not from the traces of a run that used it"
+
+[[row]]
+id = "c05.f.trace-deleted.E@6"
+question = "With the trace of step 3 deleted, what does E@6 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2(e); 2.4; Decision 12"
+core = true
+given = { request = "withdraw A", artifact = "E@6", state = "f.trace-deleted" }
+expect = { answer = "may contain", names = "step untraced", failing = { condition = "e", segment = "E/seg-1", step = 3 } }
+source = "hand-written table: a step of its history has no trace, so the tool cannot show the step read no affected record, although shards 1 and 2 hold none (2.4, Decision 12)"
+
+[[row]]
+id = "c05.f.trace-deleted.E@9"
+question = "With the trace of step 3 deleted, what does E@9 answer under withdraw A?"
+plan = "5.5 Check 5 (checkpoint 9 under a segment-1 fault); 2.4; Decision 20"
+core = true
+given = { request = "withdraw A", artifact = "E@9", state = "f.trace-deleted" }
+expect = { answer = "contains", basis = "whole-sample read assumed (F9, L9)", first_exposure = { segment = "E/seg-2", step = 7 }, untraced_steps = [["E/seg-1", 3], ["E/seg-2", 8]] }
+source = "hand-written table: the read of T at step 7 is untouched; a recorded \"contains\" wins over a failed condition elsewhere, and the untraced steps are listed beside the chain (2.4, Decision 20)"
+
+[[row]]
+id = "c05.f.trace-deleted.D@3"
+question = "With the trace of step 3 deleted, what does D@3 answer under withdraw A?"
+plan = "5.5 Check 5; 2.4; Decision 20"
+core = true
+given = { request = "withdraw A", artifact = "D@3", state = "f.trace-deleted" }
+expect = { answer = "contains", untraced_steps = [["E/seg-1", 3], ["E/seg-2", 8]] }
+source = "hand-written table: its ancestor E@9 still answers \"contains\" (2.4)"
+
+[[row]]
+id = "c05.f.trace-deleted.Y@6"
+question = "With the trace of step 3 deleted, what does Y@6 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2(e) (ancestors included); 2.4"
+core = true
+given = { request = "withdraw A", artifact = "Y@6", state = "f.trace-deleted" }
+expect = { answer = "may contain", failing = { condition = "e", segment = "E/seg-1", step = 3 } }
+source = "hand-written table: Y's history runs through E/seg-1, so the untraced step is in it (2.2(e)); Y read no affected record itself and still cannot answer \"does not contain\""
+
+[[row]]
+id = "c05.f.trace-deleted.K@3"
+question = "With the trace of step 3 deleted, what does K@3 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2(e) (ancestors included); 2.4"
+core = true
+given = { request = "withdraw A", artifact = "K@3", state = "f.trace-deleted" }
+expect = { answer = "may contain", failing = { condition = "e", segment = "E/seg-1", step = 3 } }
+expect_under = { cyclic-wrapper-route = { answer = "may contain" } }
+source = "hand-written table: K starts from E@6, so step 3 of E/seg-1 is in its history (2.2(e))"
+
+[[row]]
+id = "c05.f.trace-deleted.K@8"
+question = "With the trace of step 3 deleted, what does K@8 answer under withdraw A?"
+plan = "5.5 Check 5; 2.4; Decision 20"
+core = true
+given = { request = "withdraw A", artifact = "K@8", state = "f.trace-deleted" }
+expect = { answer = "contains", untraced_steps = [["E/seg-1", 3]] }
+expect_under = { cyclic-wrapper-route = { answer = "may contain" } }
+source = "hand-written table: K's own read of T is untouched; a recorded \"contains\" wins (Decision 20)"
+
+[[row]]
+id = "c05.f.trace-deleted.K@40"
+question = "With the trace of step 3 deleted, what does K@40 answer under withdraw A?"
+plan = "5.5 Check 5; 2.4; Decision 20"
+core = true
+given = { request = "withdraw A", artifact = "K@40", state = "f.trace-deleted" }
+expect = { answer = "contains", untraced_steps = [["E/seg-1", 3]] }
+expect_under = { cyclic-wrapper-route = { answer = "may contain" } }
+source = "hand-written table: K's own read of T is untouched; a recorded \"contains\" wins (Decision 20)"
+
+# ==================================================================================
+# B2. Fault f.trace-half: the last sample of step 4 of E/seg-1 is marked half
+# covered; the sample is still counted, so no loud check stops (plan 3.4).
+# ==================================================================================
+
+[[row]]
+id = "c05.f.trace-half.src/A"
+question = "With step 4 half covered, what does src/A answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "src/A", state = "f.trace-half" }
+expect = { answer = "contains" }
+source = "hand-written table: a step trace is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.trace-half.src/B"
+question = "With step 4 half covered, what does src/B answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "src/B", state = "f.trace-half" }
+expect = { answer = "does not contain" }
+source = "hand-written table: a step trace is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.trace-half.src/C"
+question = "With step 4 half covered, what does src/C answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "src/C", state = "f.trace-half" }
+expect = { answer = "does not contain" }
+source = "hand-written table: a step trace is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.trace-half.src/Z"
+question = "With step 4 half covered, what does src/Z answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "src/Z", state = "f.trace-half" }
+expect = { answer = "does not contain" }
+source = "hand-written table: a step trace is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.trace-half.gen/P"
+question = "With step 4 half covered, what does gen/P answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "gen/P", state = "f.trace-half" }
+expect = { answer = "contains" }
+source = "hand-written table: a step trace is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.trace-half.gen/T"
+question = "With step 4 half covered, what does gen/T answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "gen/T", state = "f.trace-half" }
+expect = { answer = "contains" }
+source = "hand-written table: a step trace is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.trace-half.gen/S"
+question = "With step 4 half covered, what does gen/S answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "gen/S", state = "f.trace-half" }
+expect = { answer = "contains" }
+source = "hand-written table: a step trace is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.trace-half.R1"
+question = "With step 4 half covered, what does R1 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "R1", state = "f.trace-half" }
+expect = { answer = "contains" }
+source = "hand-written table: a step trace is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.trace-half.R2"
+question = "With step 4 half covered, what does R2 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "R2", state = "f.trace-half" }
+expect = { answer = "does not contain" }
+source = "hand-written table: a step trace is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.trace-half.E/shard-1"
+question = "With step 4 half covered, what does E/shard-1 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2; 3.5 (a gap is a mark in a step trace, never a missing row of a shard map)"
+core = true
+given = { request = "withdraw A", artifact = "E/shard-1", state = "f.trace-half" }
+expect = { answer = "does not contain" }
+source = "hand-written table: a step trace is outside this artifact's ancestor closure; the shard's map is whole"
+
+[[row]]
+id = "c05.f.trace-half.E/shard-2"
+question = "With step 4 half covered, what does E/shard-2 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2; 3.5"
+core = true
+given = { request = "withdraw A", artifact = "E/shard-2", state = "f.trace-half" }
+expect = { answer = "does not contain" }
+source = "hand-written table: a step trace is outside this artifact's ancestor closure; the shard's map is whole"
+
+[[row]]
+id = "c05.f.trace-half.E/shard-3"
+question = "With step 4 half covered, what does E/shard-3 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "E/shard-3", state = "f.trace-half" }
+expect = { answer = "contains" }
+source = "hand-written table: a step trace is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.trace-half.E/mix-1"
+question = "With step 4 half covered, what does E/mix-1 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "E/mix-1", state = "f.trace-half" }
+expect = { answer = "does not contain" }
+source = "hand-written table: a mixture is answered from its snapshot and shards, not from the traces of a run that used it"
+
+[[row]]
+id = "c05.f.trace-half.E/mix-2"
+question = "With step 4 half covered, what does E/mix-2 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "E/mix-2", state = "f.trace-half" }
+expect = { answer = "contains" }
+source = "hand-written table: a mixture is answered from its snapshot and shards, not from the traces of a run that used it"
+
+[[row]]
+id = "c05.f.trace-half.D/mix-1"
+question = "With step 4 half covered, what does D/mix-1 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "D/mix-1", state = "f.trace-half" }
+expect = { answer = "does not contain" }
+source = "hand-written table: a mixture is answered from its snapshot and shards, not from the traces of a run that used it"
+
+[[row]]
+id = "c05.f.trace-half.Y/mix-1"
+question = "With step 4 half covered, what does Y/mix-1 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "Y/mix-1", state = "f.trace-half" }
+expect = { answer = "contains" }
+source = "hand-written table: a mixture is answered from its snapshot and shards, not from the traces of a run that used it"
+
+[[row]]
+id = "c05.f.trace-half.K/mix-1"
+question = "With step 4 half covered, what does K/mix-1 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "K/mix-1", state = "f.trace-half" }
+expect = { answer = "contains" }
+source = "hand-written table: a mixture is answered from its snapshot and shards, not from the traces of a run that used it"
+
+[[row]]
+id = "c05.f.trace-half.E@6"
+question = "With step 4 half covered, what does E@6 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2(e); 3.5; 2.4"
+core = true
+given = { request = "withdraw A", artifact = "E@6", state = "f.trace-half" }
+expect = { answer = "may contain", names = "step untraced", failing = { condition = "e", segment = "E/seg-1", step = 4 } }
+source = "hand-written table: a sample of step 4 has an uncovered range, so the step is untraced; the unread tokens never count as absent (3.5)"
+
+[[row]]
+id = "c05.f.trace-half.E@9"
+question = "With step 4 half covered, what does E@9 answer under withdraw A?"
+plan = "5.5 Check 5 (checkpoint 9 under a segment-1 fault); 2.4; Decision 20"
+core = true
+given = { request = "withdraw A", artifact = "E@9", state = "f.trace-half" }
+expect = { answer = "contains", basis = "whole-sample read assumed (F9, L9)", first_exposure = { segment = "E/seg-2", step = 7 }, untraced_steps = [["E/seg-1", 4], ["E/seg-2", 8]] }
+source = "hand-written table: the read of T at step 7 is untouched; a recorded \"contains\" wins (Decision 20)"
+
+[[row]]
+id = "c05.f.trace-half.D@3"
+question = "With step 4 half covered, what does D@3 answer under withdraw A?"
+plan = "5.5 Check 5; 2.4; Decision 20"
+core = true
+given = { request = "withdraw A", artifact = "D@3", state = "f.trace-half" }
+expect = { answer = "contains", untraced_steps = [["E/seg-1", 4], ["E/seg-2", 8]] }
+source = "hand-written table: its ancestor E@9 still answers \"contains\" (2.4)"
+
+[[row]]
+id = "c05.f.trace-half.Y@6"
+question = "With step 4 half covered, what does Y@6 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2(e) (ancestors included); 2.4"
+core = true
+given = { request = "withdraw A", artifact = "Y@6", state = "f.trace-half" }
+expect = { answer = "may contain", failing = { condition = "e", segment = "E/seg-1", step = 4 } }
+source = "hand-written table: Y's history runs through E/seg-1, so the untraced step is in it (2.2(e))"
+
+[[row]]
+id = "c05.f.trace-half.K@3"
+question = "With step 4 half covered, what does K@3 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2(e) (ancestors included); 2.4"
+core = true
+given = { request = "withdraw A", artifact = "K@3", state = "f.trace-half" }
+expect = { answer = "may contain", failing = { condition = "e", segment = "E/seg-1", step = 4 } }
+expect_under = { cyclic-wrapper-route = { answer = "may contain" } }
+source = "hand-written table: K starts from E@6, so step 4 of E/seg-1 is in its history (2.2(e))"
+
+[[row]]
+id = "c05.f.trace-half.K@8"
+question = "With step 4 half covered, what does K@8 answer under withdraw A?"
+plan = "5.5 Check 5; 2.4; Decision 20"
+core = true
+given = { request = "withdraw A", artifact = "K@8", state = "f.trace-half" }
+expect = { answer = "contains", untraced_steps = [["E/seg-1", 4]] }
+expect_under = { cyclic-wrapper-route = { answer = "may contain" } }
+source = "hand-written table: K's own read of T is untouched; a recorded \"contains\" wins (Decision 20)"
+
+[[row]]
+id = "c05.f.trace-half.K@40"
+question = "With step 4 half covered, what does K@40 answer under withdraw A?"
+plan = "5.5 Check 5; 2.4; Decision 20"
+core = true
+given = { request = "withdraw A", artifact = "K@40", state = "f.trace-half" }
+expect = { answer = "contains", untraced_steps = [["E/seg-1", 4]] }
+expect_under = { cyclic-wrapper-route = { answer = "may contain" } }
+source = "hand-written table: K's own read of T is untouched; a recorded \"contains\" wins (Decision 20)"
+
+# ==================================================================================
+# B3. Fault f.edge-deleted: the stated edge of P in gen/P is deleted.
+# P's occurrence then has no recorded chain to an ingested revision (2.2(a), 2.3).
+# The fault lies on the chain X@A -> P -> T. It is in the closure of everything that
+# holds P or T, and of every checkpoint whose steps read T.
+# ==================================================================================
+
+[[row]]
+id = "c05.f.edge-deleted.src/A"
+question = "With P's edge deleted, what does src/A answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "src/A", state = "f.edge-deleted" }
+expect = { answer = "contains" }
+source = "hand-written table: the fault is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.edge-deleted.src/B"
+question = "With P's edge deleted, what does src/B answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "src/B", state = "f.edge-deleted" }
+expect = { answer = "does not contain" }
+source = "hand-written table: the fault is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.edge-deleted.src/C"
+question = "With P's edge deleted, what does src/C answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "src/C", state = "f.edge-deleted" }
+expect = { answer = "does not contain" }
+source = "hand-written table: the fault is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.edge-deleted.src/Z"
+question = "With P's edge deleted, what does src/Z answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "src/Z", state = "f.edge-deleted" }
+expect = { answer = "does not contain" }
+source = "hand-written table: the fault is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.edge-deleted.gen/P"
+question = "With P's edge deleted, what does gen/P answer under withdraw A?"
+plan = "5.5 Check 5; 2.2(a); 2.3; 2.1"
+core = true
+given = { request = "withdraw A", artifact = "gen/P", state = "f.edge-deleted" }
+expect = { answer = "may contain", names = "missing origin", failing = { condition = "a", artifact = "gen/P", record = "P" } }
+source = "hand-written table: the file's own record exists and its one record has no recorded origin, so it is \"may contain\" naming the occurrence, never \"not covered\" and never \"does not contain\" (2.3, 2.1)"
+
+[[row]]
+id = "c05.f.edge-deleted.gen/T"
+question = "With P's edge deleted, what does gen/T answer under withdraw A?"
+plan = "5.5 Check 5; 2.2(a); 2.3"
+core = true
+given = { request = "withdraw A", artifact = "gen/T", state = "f.edge-deleted" }
+expect = { answer = "may contain", names = "missing origin", failing = { condition = "a", artifact = "gen/P", record = "P" } }
+source = "hand-written table: T's chain reaches P and ends there, short of an ingested revision (2.2(a))"
+
+[[row]]
+id = "c05.f.edge-deleted.gen/S"
+question = "With P's edge deleted, what does gen/S answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "gen/S", state = "f.edge-deleted" }
+expect = { answer = "contains" }
+source = "hand-written table: S is made from SA and SC; the fault is outside its ancestor closure"
+
+[[row]]
+id = "c05.f.edge-deleted.R1"
+question = "With P's edge deleted, what does R1 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2 closing paragraph; Decision 20"
+core = true
+given = { request = "withdraw A", artifact = "R1", state = "f.edge-deleted" }
+expect = { answer = "contains" }
+source = "hand-written table: R1's rows P and T lose their origin, but its row X still has a recorded chain to X@A and its row S to SA; a recorded \"contains\" wins over a failed condition elsewhere (Decision 20)"
+
+[[row]]
+id = "c05.f.edge-deleted.R2"
+question = "With P's edge deleted, what does R2 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "R2", state = "f.edge-deleted" }
+expect = { answer = "does not contain" }
+source = "hand-written table: the fault is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.edge-deleted.E/shard-1"
+question = "With P's edge deleted, what does E/shard-1 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "E/shard-1", state = "f.edge-deleted" }
+expect = { answer = "does not contain" }
+source = "hand-written table: the fault is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.edge-deleted.E/shard-2"
+question = "With P's edge deleted, what does E/shard-2 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "E/shard-2", state = "f.edge-deleted" }
+expect = { answer = "does not contain" }
+source = "hand-written table: the fault is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.edge-deleted.E/shard-3"
+question = "With P's edge deleted, what does E/shard-3 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2(a); 2.3"
+core = true
+given = { request = "withdraw A", artifact = "E/shard-3", state = "f.edge-deleted" }
+expect = { answer = "may contain", names = "missing origin", failing = { condition = "a", artifact = "gen/P", record = "P" } }
+source = "hand-written table: the shard's only chain to A ran through the deleted edge; its document T now has no recorded origin, and no other chain shows \"contains\""
+
+[[row]]
+id = "c05.f.edge-deleted.E/mix-1"
+question = "With P's edge deleted, what does E/mix-1 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "E/mix-1", state = "f.edge-deleted" }
+expect = { answer = "does not contain" }
+source = "hand-written table: shards 1 and 2 hold nothing derived from P; the fault is outside this artifact's ancestor closure"
+
+[[row]]
+id = "c05.f.edge-deleted.E/mix-2"
+question = "With P's edge deleted, what does E/mix-2 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2(a)"
+core = true
+given = { request = "withdraw A", artifact = "E/mix-2", state = "f.edge-deleted" }
+expect = { answer = "may contain", names = "missing origin", failing = { condition = "a", artifact = "gen/P", record = "P" } }
+source = "hand-written table: it holds shard 3, whose document T has no recorded origin"
+
+[[row]]
+id = "c05.f.edge-deleted.D/mix-1"
+question = "With P's edge deleted, what does D/mix-1 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "D/mix-1", state = "f.edge-deleted" }
+expect = { answer = "does not contain" }
+source = "hand-written table: shards 1 and 2 hold nothing derived from P; the fault is outside this artifact's ancestor closure"
+
+[[row]]
+id = "c05.f.edge-deleted.Y/mix-1"
+question = "With P's edge deleted, what does Y/mix-1 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2(a)"
+core = true
+given = { request = "withdraw A", artifact = "Y/mix-1", state = "f.edge-deleted" }
+expect = { answer = "may contain", names = "missing origin", failing = { condition = "a", artifact = "gen/P", record = "P" } }
+source = "hand-written table: it holds shard 3, whose document T has no recorded origin"
+
+[[row]]
+id = "c05.f.edge-deleted.K/mix-1"
+question = "With P's edge deleted, what does K/mix-1 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2(a)"
+core = true
+given = { request = "withdraw A", artifact = "K/mix-1", state = "f.edge-deleted" }
+expect = { answer = "may contain", names = "missing origin", failing = { condition = "a", artifact = "gen/P", record = "P" } }
+source = "hand-written table: it holds shard 3, whose document T has no recorded origin"
+
+[[row]]
+id = "c05.f.edge-deleted.E@6"
+question = "With P's edge deleted, what does E@6 answer under withdraw A?"
+plan = "5.5 Check 5 (a \"does not contain\" where the fault does not touch the closure); 2.4"
+core = true
+given = { request = "withdraw A", artifact = "E@6", state = "f.edge-deleted" }
+expect = { answer = "does not contain" }
+source = "hand-written table: its steps read shards 1 and 2 only; the fault is outside its closure"
+
+[[row]]
+id = "c05.f.edge-deleted.E@9"
+question = "With P's edge deleted, what does E@9 answer under withdraw A?"
+plan = "5.5 Check 5; 2.4 (a record its steps consumed fails a condition); 2.2(a)"
+core = true
+given = { request = "withdraw A", artifact = "E@9", state = "f.edge-deleted" }
+expect = { answer = "may contain", names = "missing origin", failing = { condition = "a", artifact = "gen/P", record = "P" } }
+source = "hand-written table: step 7 consumed T, and T's chain now ends short of an ingested revision; no recorded chain shows \"contains\" any more"
+
+[[row]]
+id = "c05.f.edge-deleted.D@3"
+question = "With P's edge deleted, what does D@3 answer under withdraw A?"
+plan = "5.5 Check 5; 2.4 (an ancestor answers \"may contain\")"
+core = true
+given = { request = "withdraw A", artifact = "D@3", state = "f.edge-deleted" }
+expect = { answer = "may contain", failing = { condition = "a", artifact = "gen/P", record = "P" } }
+source = "hand-written table: its ancestor E@9 answers \"may contain\"; D's own steps read shards 1 and 2 only"
+
+[[row]]
+id = "c05.f.edge-deleted.Y@6"
+question = "With P's edge deleted, what does Y@6 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2(a) (for a checkpoint, the occurrences its traced steps consumed); 2.4; 4.5"
+core = true
+given = { request = "withdraw A", artifact = "Y@6", state = "f.edge-deleted" }
+expect = { answer = "does not contain" }
+source = "hand-written table: Y's steps never read T (search condition 14), so the faulted chain is not in the ancestry of any record Y consumed; a checkpoint whose steps read none of the faulted records keeps the answer its traced history gives (4.5). README section 9, reading 1"
+
+[[row]]
+id = "c05.f.edge-deleted.K@3"
+question = "With P's edge deleted, what does K@3 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2(a); 2.4; 4.5"
+core = true
+given = { request = "withdraw A", artifact = "K@3", state = "f.edge-deleted" }
+expect = { answer = "does not contain" }
+expect_under = { cyclic-wrapper-route = { answer = "may contain", names = "cyclic order not recorded" } }
+source = "hand-written table: K's steps 1 to 3 read no token of T (search condition 22); README section 9, reading 1"
+
+[[row]]
+id = "c05.f.edge-deleted.K@8"
+question = "With P's edge deleted, what does K@8 answer under withdraw A?"
+plan = "5.5 Check 5; 2.4; 2.2(a)"
+core = true
+given = { request = "withdraw A", artifact = "K@8", state = "f.edge-deleted" }
+expect = { answer = "may contain", names = "missing origin", failing = { condition = "a", artifact = "gen/P", record = "P" } }
+expect_under = { cyclic-wrapper-route = { answer = "may contain" } }
+source = "hand-written table: a step of K up to step 8 consumed T (search condition 22), and T's chain ends short"
+
+[[row]]
+id = "c05.f.edge-deleted.K@40"
+question = "With P's edge deleted, what does K@40 answer under withdraw A?"
+plan = "5.5 Check 5; 2.4; 2.2(a)"
+core = true
+given = { request = "withdraw A", artifact = "K@40", state = "f.edge-deleted" }
+expect = { answer = "may contain", names = "missing origin", failing = { condition = "a", artifact = "gen/P", record = "P" } }
+expect_under = { cyclic-wrapper-route = { answer = "may contain" } }
+source = "hand-written table: its history holds the step that consumed T, and T's chain ends short"
+
+# ==================================================================================
+# B4. Fault f.map-deleted: the capture map of E/shard-1 is deleted.
+# The shard's own record is missing: "not covered", "record missing". Everything
+# downstream of it answers "may contain" naming the missing record, unless a
+# recorded chain the fault does not touch shows "contains" (2.1, Decisions 20, 21).
+# Every checkpoint's history runs through E/seg-1, whose steps read documents of
+# shard 1 (search condition 11).
+# ==================================================================================
+
+[[row]]
+id = "c05.f.map-deleted.src/A"
+question = "With the map of shard 1 deleted, what does src/A answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "src/A", state = "f.map-deleted" }
+expect = { answer = "contains" }
+source = "hand-written table: a shard's map is downstream of this artifact, not in its ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.map-deleted.src/B"
+question = "With the map of shard 1 deleted, what does src/B answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "src/B", state = "f.map-deleted" }
+expect = { answer = "does not contain" }
+source = "hand-written table: a shard's map is downstream of this artifact, not in its ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.map-deleted.src/C"
+question = "With the map of shard 1 deleted, what does src/C answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "src/C", state = "f.map-deleted" }
+expect = { answer = "does not contain" }
+source = "hand-written table: the fault is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.map-deleted.src/Z"
+question = "With the map of shard 1 deleted, what does src/Z answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "src/Z", state = "f.map-deleted" }
+expect = { answer = "does not contain" }
+source = "hand-written table: a shard's map is downstream of this artifact, not in its ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.map-deleted.gen/P"
+question = "With the map of shard 1 deleted, what does gen/P answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "gen/P", state = "f.map-deleted" }
+expect = { answer = "contains" }
+source = "hand-written table: the fault is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.map-deleted.gen/T"
+question = "With the map of shard 1 deleted, what does gen/T answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "gen/T", state = "f.map-deleted" }
+expect = { answer = "contains" }
+source = "hand-written table: the fault is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.map-deleted.gen/S"
+question = "With the map of shard 1 deleted, what does gen/S answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "gen/S", state = "f.map-deleted" }
+expect = { answer = "contains" }
+source = "hand-written table: the fault is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.map-deleted.R1"
+question = "With the map of shard 1 deleted, what does R1 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "R1", state = "f.map-deleted" }
+expect = { answer = "contains" }
+source = "hand-written table: the fault is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.map-deleted.R2"
+question = "With the map of shard 1 deleted, what does R2 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "R2", state = "f.map-deleted" }
+expect = { answer = "does not contain" }
+source = "hand-written table: the fault is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.map-deleted.E/shard-1"
+question = "With its map deleted, what does E/shard-1 answer under withdraw A?"
+plan = "5.5 Check 5 (the shard whose own map was deleted); 2.1; 2.3; Decision 21"
+core = true
+given = { request = "withdraw A", artifact = "E/shard-1", state = "f.map-deleted" }
+expect = { answer = "not covered", reason = "record missing" }
+source = "hand-written table: the shard is registered and mixture snapshots name it, but its own record, the map, is missing (2.1)"
+
+[[row]]
+id = "c05.f.map-deleted.E/shard-2"
+question = "With the map of shard 1 deleted, what does E/shard-2 answer under withdraw A?"
+plan = "5.5 Check 5 (a \"does not contain\" where the fault does not touch the closure); 2.2"
+core = true
+given = { request = "withdraw A", artifact = "E/shard-2", state = "f.map-deleted" }
+expect = { answer = "does not contain" }
+source = "hand-written table: another shard's map is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.map-deleted.E/shard-3"
+question = "With the map of shard 1 deleted, what does E/shard-3 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "E/shard-3", state = "f.map-deleted" }
+expect = { answer = "contains" }
+source = "hand-written table: another shard's map is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.map-deleted.E/mix-1"
+question = "With the map of shard 1 deleted, what does E/mix-1 answer under withdraw A?"
+plan = "5.5 Check 5 (everything downstream of it \"may contain\"); 2.1; Decision 21"
+core = true
+given = { request = "withdraw A", artifact = "E/mix-1", state = "f.map-deleted" }
+expect = { answer = "may contain", names = "upstream record missing", failing = { artifact = "E/shard-1" } }
+source = "hand-written table: the mixture's own record, its snapshot, exists; it is downstream of a shard that is \"not covered\", so it names the missing record and is never \"not covered\" and never \"does not contain\" (2.1)"
+
+[[row]]
+id = "c05.f.map-deleted.E/mix-2"
+question = "With the map of shard 1 deleted, what does E/mix-2 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2 closing paragraph (for a mixture, a shard or a checkpoint alike); Decision 20"
+core = true
+given = { request = "withdraw A", artifact = "E/mix-2", state = "f.map-deleted" }
+expect = { answer = "contains" }
+source = "hand-written table: the mixture is downstream of the faulted shard, but the chain through shard 3 to T is recorded and untouched; a recorded \"contains\" wins (Decision 20)"
+
+[[row]]
+id = "c05.f.map-deleted.D/mix-1"
+question = "With the map of shard 1 deleted, what does D/mix-1 answer under withdraw A?"
+plan = "5.5 Check 5; 2.1; Decision 21"
+core = true
+given = { request = "withdraw A", artifact = "D/mix-1", state = "f.map-deleted" }
+expect = { answer = "may contain", names = "upstream record missing", failing = { artifact = "E/shard-1" } }
+source = "hand-written table: its snapshot names shard 1, whose own record is missing (2.1)"
+
+[[row]]
+id = "c05.f.map-deleted.Y/mix-1"
+question = "With the map of shard 1 deleted, what does Y/mix-1 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2 closing paragraph; Decision 20"
+core = true
+given = { request = "withdraw A", artifact = "Y/mix-1", state = "f.map-deleted" }
+expect = { answer = "contains" }
+source = "hand-written table: the chain through shard 3 to T is recorded and untouched; a recorded \"contains\" wins (Decision 20)"
+
+[[row]]
+id = "c05.f.map-deleted.K/mix-1"
+question = "With the map of shard 1 deleted, what does K/mix-1 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "K/mix-1", state = "f.map-deleted" }
+expect = { answer = "contains" }
+source = "hand-written table: K's mixture is shards 3 and 2; shard 1 is not in its closure"
+
+[[row]]
+id = "c05.f.map-deleted.E@6"
+question = "With the map of shard 1 deleted, what does E@6 answer under withdraw A?"
+plan = "5.5 Check 5; 2.1; 2.4; Decision 21"
+core = true
+given = { request = "withdraw A", artifact = "E@6", state = "f.map-deleted" }
+expect = { answer = "may contain", failing = { artifact = "E/shard-1" } }
+source = "hand-written table: its steps read documents of shard 1 (search condition 11), which now cannot be tied to any record; downstream of a \"not covered\" artifact the answer is \"may contain\" naming the missing record (2.1)"
+
+[[row]]
+id = "c05.f.map-deleted.E@9"
+question = "With the map of shard 1 deleted, what does E@9 answer under withdraw A?"
+plan = "5.5 Check 5; 2.4; Decision 20"
+core = true
+given = { request = "withdraw A", artifact = "E@9", state = "f.map-deleted" }
+expect = { answer = "contains", first_exposure = { segment = "E/seg-2", step = 7 } }
+source = "hand-written table: the read of T at step 7 goes through shard 3's map, which is untouched; a recorded \"contains\" wins (Decision 20)"
+
+[[row]]
+id = "c05.f.map-deleted.D@3"
+question = "With the map of shard 1 deleted, what does D@3 answer under withdraw A?"
+plan = "5.5 Check 5; 2.4; Decision 20"
+core = true
+given = { request = "withdraw A", artifact = "D@3", state = "f.map-deleted" }
+expect = { answer = "contains" }
+source = "hand-written table: its ancestor E@9 still answers \"contains\" (2.4)"
+
+[[row]]
+id = "c05.f.map-deleted.Y@6"
+question = "With the map of shard 1 deleted, what does Y@6 answer under withdraw A?"
+plan = "5.5 Check 5; 2.1; 2.4"
+core = true
+given = { request = "withdraw A", artifact = "Y@6", state = "f.map-deleted" }
+expect = { answer = "may contain", failing = { artifact = "E/shard-1" } }
+source = "hand-written table: Y's history runs through E/seg-1, whose steps read documents of shard 1 (search condition 11)"
+
+[[row]]
+id = "c05.f.map-deleted.K@3"
+question = "With the map of shard 1 deleted, what does K@3 answer under withdraw A?"
+plan = "5.5 Check 5; 2.1; 2.4"
+core = true
+given = { request = "withdraw A", artifact = "K@3", state = "f.map-deleted" }
+expect = { answer = "may contain", failing = { artifact = "E/shard-1" } }
+expect_under = { cyclic-wrapper-route = { answer = "may contain" } }
+source = "hand-written table: K starts from E@6, whose steps read documents of shard 1 (search condition 11); K's own mixture does not hold shard 1"
+
+[[row]]
+id = "c05.f.map-deleted.K@8"
+question = "With the map of shard 1 deleted, what does K@8 answer under withdraw A?"
+plan = "5.5 Check 5; 2.4; Decision 20"
+core = true
+given = { request = "withdraw A", artifact = "K@8", state = "f.map-deleted" }
+expect = { answer = "contains" }
+expect_under = { cyclic-wrapper-route = { answer = "may contain" } }
+source = "hand-written table: K's own read of T goes through shard 3's map; a recorded \"contains\" wins (Decision 20)"
+
+[[row]]
+id = "c05.f.map-deleted.K@40"
+question = "With the map of shard 1 deleted, what does K@40 answer under withdraw A?"
+plan = "5.5 Check 5; 2.4; Decision 20"
+core = true
+given = { request = "withdraw A", artifact = "K@40", state = "f.map-deleted" }
+expect = { answer = "contains" }
+expect_under = { cyclic-wrapper-route = { answer = "may contain" } }
+source = "hand-written table: K's own read of T goes through shard 3's map; a recorded \"contains\" wins (Decision 20)"
+
+# ==================================================================================
+# B5. Fault f.edge-file-level: the stated edge of T in gen/T is downgraded to
+# file-level, and the request is record-level: "withdraw A, record X@A".
+# First the unmutated answers under that request, for the artifacts the fault
+# changes and for gen/S, whose answer differs from the one under "withdraw A".
+# ==================================================================================
+
+[[row]]
+id = "c05.record-X@A.unmutated.gen/T"
+question = "Unmutated, what does gen/T answer for the record X@A alone?"
+plan = "5.5 Check 5; 2.3 (a list of records); 3.2"
+core = true
+given = { request = "withdraw A, record X@A", artifact = "gen/T", state = "unmutated" }
+expect = { answer = "contains", chain = ["gen/T:T", "gen/P:P", "src/A:X@A"] }
+source = "hand-written table: every link from T to X@A is observed, and observed links decide record-level requests (3.2)"
+
+[[row]]
+id = "c05.record-X@A.unmutated.gen/S"
+question = "Unmutated, what does gen/S answer for the record X@A alone?"
+plan = "5.5 Check 5; 2.3; 2.2(g)"
+core = true
+given = { request = "withdraw A, record X@A", artifact = "gen/S", state = "unmutated" }
+expect = { answer = "does not contain", notes = ["generating-model exposure not assessed"], scope = { source = "A", records = ["X@A"] } }
+source = "hand-written table: S states it used SA and SC, and its job's log shows it read nothing else, so it does not derive from X@A. The negative passes S's own generation edge, so with the generating-model extension off it carries the words of 2.2(h) for the off state, as every such negative does (2.1)"
+
+[[row]]
+id = "c05.record-X@A.unmutated.E/shard-3"
+question = "Unmutated, what does E/shard-3 answer for the record X@A alone?"
+plan = "5.5 Check 5; 2.3; 3.2"
+core = true
+given = { request = "withdraw A, record X@A", artifact = "E/shard-3", state = "unmutated" }
+expect = { answer = "contains" }
+source = "hand-written table: T runs through P to X@A on links that decide record-level requests"
+
+[[row]]
+id = "c05.record-X@A.unmutated.E/mix-2"
+question = "Unmutated, what does E/mix-2 answer for the record X@A alone?"
+plan = "5.5 Check 5; 2.3; 3.2"
+core = true
+given = { request = "withdraw A, record X@A", artifact = "E/mix-2", state = "unmutated" }
+expect = { answer = "contains" }
+source = "hand-written table: it holds shard 3"
+
+[[row]]
+id = "c05.record-X@A.unmutated.Y/mix-1"
+question = "Unmutated, what does Y/mix-1 answer for the record X@A alone?"
+plan = "5.5 Check 5; 2.3; 3.2"
+core = true
+given = { request = "withdraw A, record X@A", artifact = "Y/mix-1", state = "unmutated" }
+expect = { answer = "contains" }
+source = "hand-written table: it holds shard 3"
+
+[[row]]
+id = "c05.record-X@A.unmutated.K/mix-1"
+question = "Unmutated, what does K/mix-1 answer for the record X@A alone?"
+plan = "5.5 Check 5; 2.3; 3.2"
+core = true
+given = { request = "withdraw A, record X@A", artifact = "K/mix-1", state = "unmutated" }
+expect = { answer = "contains" }
+source = "hand-written table: it holds shard 3"
+
+[[row]]
+id = "c05.record-X@A.unmutated.E@9"
+question = "Unmutated, what does E@9 answer for the record X@A alone?"
+plan = "5.5 Check 5; 2.3; 2.4"
+core = true
+given = { request = "withdraw A, record X@A", artifact = "E@9", state = "unmutated" }
+expect = { answer = "contains", first_exposure = { segment = "E/seg-2", step = 7 } }
+source = "hand-written table: step 7 consumed T, which derives from X@A"
+
+[[row]]
+id = "c05.record-X@A.unmutated.D@3"
+question = "Unmutated, what does D@3 answer for the record X@A alone?"
+plan = "5.5 Check 5; 2.3; 2.4"
+core = true
+given = { request = "withdraw A, record X@A", artifact = "D@3", state = "unmutated" }
+expect = { answer = "contains" }
+source = "hand-written table: its ancestor E@9 answers \"contains\""
+
+[[row]]
+id = "c05.record-X@A.unmutated.K@8"
+question = "Unmutated, what does K@8 answer for the record X@A alone?"
+plan = "5.5 Check 5; 2.3; 2.4"
+core = true
+given = { request = "withdraw A, record X@A", artifact = "K@8", state = "unmutated" }
+expect = { answer = "contains" }
+expect_under = { cyclic-wrapper-route = { answer = "may contain", names = "cyclic order not recorded" } }
+source = "hand-written table: a step of K up to step 8 consumed T (search condition 22)"
+
+[[row]]
+id = "c05.record-X@A.unmutated.K@40"
+question = "Unmutated, what does K@40 answer for the record X@A alone?"
+plan = "5.5 Check 5; 2.3; 2.4"
+core = true
+given = { request = "withdraw A, record X@A", artifact = "K@40", state = "unmutated" }
+expect = { answer = "contains" }
+expect_under = { cyclic-wrapper-route = { answer = "may contain", names = "cyclic order not recorded" } }
+source = "hand-written table: its history holds the step that consumed T"
+
+# The fault itself.
+
+[[row]]
+id = "c05.f.edge-file-level.src/A"
+question = "With T's edge at file level, what does src/A answer for the record X@A alone?"
+plan = "5.5 Check 5; 2.3"
+core = true
+given = { request = "withdraw A, record X@A", artifact = "src/A", state = "f.edge-file-level" }
+expect = { answer = "contains" }
+source = "hand-written table: the file holds the named record itself; the fault is outside its ancestor closure"
+
+[[row]]
+id = "c05.f.edge-file-level.src/B"
+question = "With T's edge at file level, what does src/B answer for the record X@A alone?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A, record X@A", artifact = "src/B", state = "f.edge-file-level" }
+expect = { answer = "does not contain" }
+source = "hand-written table: the fault is outside this artifact's ancestor closure; X@B is B's own record (L12)"
+
+[[row]]
+id = "c05.f.edge-file-level.src/C"
+question = "With T's edge at file level, what does src/C answer for the record X@A alone?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A, record X@A", artifact = "src/C", state = "f.edge-file-level" }
+expect = { answer = "does not contain" }
+source = "hand-written table: the fault is outside this artifact's ancestor closure"
+
+[[row]]
+id = "c05.f.edge-file-level.src/Z"
+question = "With T's edge at file level, what does src/Z answer for the record X@A alone?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A, record X@A", artifact = "src/Z", state = "f.edge-file-level" }
+expect = { answer = "does not contain" }
+source = "hand-written table: the fault is outside this artifact's ancestor closure"
+
+[[row]]
+id = "c05.f.edge-file-level.gen/P"
+question = "With T's edge at file level, what does gen/P answer for the record X@A alone?"
+plan = "5.5 Check 5; 3.2"
+core = true
+given = { request = "withdraw A, record X@A", artifact = "gen/P", state = "f.edge-file-level" }
+expect = { answer = "contains" }
+source = "hand-written table: P's own edge to X@A is still observed; T's edge is downstream of P"
+
+[[row]]
+id = "c05.f.edge-file-level.gen/T"
+question = "With T's edge at file level, what does gen/T answer for the record X@A alone?"
+plan = "5.5 Check 5; 2.2(b); 3.2 (file-level decides requests about the whole file or source only)"
+core = true
+given = { request = "withdraw A, record X@A", artifact = "gen/T", state = "f.edge-file-level" }
+expect = { answer = "may contain", names = "evidence level cannot decide the request", failing = { condition = "b", artifact = "gen/T", record = "T" } }
+source = "hand-written table: T's only link is file-level, which cannot decide a request narrowed to a record (3.2), so condition (b) fails at that link"
+
+[[row]]
+id = "c05.f.edge-file-level.gen/S"
+question = "With T's edge at file level, what does gen/S answer for the record X@A alone?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A, record X@A", artifact = "gen/S", state = "f.edge-file-level" }
+expect = { answer = "does not contain" }
+source = "hand-written table: the fault is outside this artifact's ancestor closure; the unmutated answer under this request stands"
+
+[[row]]
+id = "c05.f.edge-file-level.R1"
+question = "With T's edge at file level, what does R1 answer for the record X@A alone?"
+plan = "5.5 Check 5; 2.2 closing paragraph; Decision 20"
+core = true
+given = { request = "withdraw A, record X@A", artifact = "R1", state = "f.edge-file-level" }
+expect = { answer = "contains" }
+source = "hand-written table: R1's row T can no longer be decided, but its rows X and P keep observed chains to X@A; a recorded \"contains\" wins (Decision 20)"
+
+[[row]]
+id = "c05.f.edge-file-level.R2"
+question = "With T's edge at file level, what does R2 answer for the record X@A alone?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A, record X@A", artifact = "R2", state = "f.edge-file-level" }
+expect = { answer = "does not contain" }
+source = "hand-written table: the fault is outside this artifact's ancestor closure"
+
+[[row]]
+id = "c05.f.edge-file-level.E/shard-1"
+question = "With T's edge at file level, what does E/shard-1 answer for the record X@A alone?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A, record X@A", artifact = "E/shard-1", state = "f.edge-file-level" }
+expect = { answer = "does not contain" }
+source = "hand-written table: the fault is outside this artifact's ancestor closure"
+
+[[row]]
+id = "c05.f.edge-file-level.E/shard-2"
+question = "With T's edge at file level, what does E/shard-2 answer for the record X@A alone?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A, record X@A", artifact = "E/shard-2", state = "f.edge-file-level" }
+expect = { answer = "does not contain" }
+source = "hand-written table: the fault is outside this artifact's ancestor closure"
+
+[[row]]
+id = "c05.f.edge-file-level.E/shard-3"
+question = "With T's edge at file level, what does E/shard-3 answer for the record X@A alone?"
+plan = "5.5 Check 5; 2.2(b); 3.2"
+core = true
+given = { request = "withdraw A, record X@A", artifact = "E/shard-3", state = "f.edge-file-level" }
+expect = { answer = "may contain", names = "evidence level cannot decide the request", failing = { condition = "b", artifact = "gen/T", record = "T" } }
+source = "hand-written table: the shard's only chain to X@A passes the file-level link"
+
+[[row]]
+id = "c05.f.edge-file-level.E/mix-1"
+question = "With T's edge at file level, what does E/mix-1 answer for the record X@A alone?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A, record X@A", artifact = "E/mix-1", state = "f.edge-file-level" }
+expect = { answer = "does not contain" }
+source = "hand-written table: the fault is outside this artifact's ancestor closure"
+
+[[row]]
+id = "c05.f.edge-file-level.E/mix-2"
+question = "With T's edge at file level, what does E/mix-2 answer for the record X@A alone?"
+plan = "5.5 Check 5; 2.2(b)"
+core = true
+given = { request = "withdraw A, record X@A", artifact = "E/mix-2", state = "f.edge-file-level" }
+expect = { answer = "may contain", names = "evidence level cannot decide the request", failing = { condition = "b", artifact = "gen/T", record = "T" } }
+source = "hand-written table: it holds shard 3, whose chain to X@A passes the file-level link"
+
+[[row]]
+id = "c05.f.edge-file-level.D/mix-1"
+question = "With T's edge at file level, what does D/mix-1 answer for the record X@A alone?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A, record X@A", artifact = "D/mix-1", state = "f.edge-file-level" }
+expect = { answer = "does not contain" }
+source = "hand-written table: the fault is outside this artifact's ancestor closure"
+
+[[row]]
+id = "c05.f.edge-file-level.Y/mix-1"
+question = "With T's edge at file level, what does Y/mix-1 answer for the record X@A alone?"
+plan = "5.5 Check 5; 2.2(b)"
+core = true
+given = { request = "withdraw A, record X@A", artifact = "Y/mix-1", state = "f.edge-file-level" }
+expect = { answer = "may contain", names = "evidence level cannot decide the request", failing = { condition = "b", artifact = "gen/T", record = "T" } }
+source = "hand-written table: it holds shard 3, whose chain to X@A passes the file-level link"
+
+[[row]]
+id = "c05.f.edge-file-level.K/mix-1"
+question = "With T's edge at file level, what does K/mix-1 answer for the record X@A alone?"
+plan = "5.5 Check 5; 2.2(b)"
+core = true
+given = { request = "withdraw A, record X@A", artifact = "K/mix-1", state = "f.edge-file-level" }
+expect = { answer = "may contain", names = "evidence level cannot decide the request", failing = { condition = "b", artifact = "gen/T", record = "T" } }
+source = "hand-written table: it holds shard 3, whose chain to X@A passes the file-level link"
+
+[[row]]
+id = "c05.f.edge-file-level.E@6"
+question = "With T's edge at file level, what does E@6 answer for the record X@A alone?"
+plan = "5.5 Check 5; 2.4"
+core = true
+given = { request = "withdraw A, record X@A", artifact = "E@6", state = "f.edge-file-level" }
+expect = { answer = "does not contain" }
+source = "hand-written table: its steps read shards 1 and 2 only; the fault is outside its closure"
+
+[[row]]
+id = "c05.f.edge-file-level.E@9"
+question = "With T's edge at file level, what does E@9 answer for the record X@A alone?"
+plan = "5.5 Check 5; 2.4 (a record its steps consumed fails a condition); 2.2(b)"
+core = true
+given = { request = "withdraw A, record X@A", artifact = "E@9", state = "f.edge-file-level" }
+expect = { answer = "may contain", names = "evidence level cannot decide the request", failing = { condition = "b", artifact = "gen/T", record = "T" } }
+source = "hand-written table: step 7 consumed T, whose link cannot decide the request"
+
+[[row]]
+id = "c05.f.edge-file-level.D@3"
+question = "With T's edge at file level, what does D@3 answer for the record X@A alone?"
+plan = "5.5 Check 5; 2.4 (an ancestor answers \"may contain\")"
+core = true
+given = { request = "withdraw A, record X@A", artifact = "D@3", state = "f.edge-file-level" }
+expect = { answer = "may contain", failing = { condition = "b", artifact = "gen/T", record = "T" } }
+source = "hand-written table: its ancestor E@9 answers \"may contain\""
+
+[[row]]
+id = "c05.f.edge-file-level.Y@6"
+question = "With T's edge at file level, what does Y@6 answer for the record X@A alone?"
+plan = "5.5 Check 5; 2.2(a); 2.4; 4.5"
+core = true
+given = { request = "withdraw A, record X@A", artifact = "Y@6", state = "f.edge-file-level" }
+expect = { answer = "does not contain" }
+source = "hand-written table: Y's steps never read T (search condition 14); README section 9, reading 1"
+
+[[row]]
+id = "c05.f.edge-file-level.K@3"
+question = "With T's edge at file level, what does K@3 answer for the record X@A alone?"
+plan = "5.5 Check 5; 2.2(a); 2.4; 4.5"
+core = true
+given = { request = "withdraw A, record X@A", artifact = "K@3", state = "f.edge-file-level" }
+expect = { answer = "does not contain" }
+expect_under = { cyclic-wrapper-route = { answer = "may contain", names = "cyclic order not recorded" } }
+source = "hand-written table: K's steps 1 to 3 read no token of T (search condition 22); README section 9, reading 1"
+
+[[row]]
+id = "c05.f.edge-file-level.K@8"
+question = "With T's edge at file level, what does K@8 answer for the record X@A alone?"
+plan = "5.5 Check 5; 2.4; 2.2(b)"
+core = true
+given = { request = "withdraw A, record X@A", artifact = "K@8", state = "f.edge-file-level" }
+expect = { answer = "may contain", names = "evidence level cannot decide the request", failing = { condition = "b", artifact = "gen/T", record = "T" } }
+expect_under = { cyclic-wrapper-route = { answer = "may contain" } }
+source = "hand-written table: a step of K up to step 8 consumed T, whose link cannot decide the request"
+
+[[row]]
+id = "c05.f.edge-file-level.K@40"
+question = "With T's edge at file level, what does K@40 answer for the record X@A alone?"
+plan = "5.5 Check 5; 2.4; 2.2(b)"
+core = true
+given = { request = "withdraw A, record X@A", artifact = "K@40", state = "f.edge-file-level" }
+expect = { answer = "may contain", names = "evidence level cannot decide the request", failing = { condition = "b", artifact = "gen/T", record = "T" } }
+expect_under = { cyclic-wrapper-route = { answer = "may contain" } }
+source = "hand-written table: its history holds the step that consumed T"
+
+# ==================================================================================
+# B6. Fault f.digest: the declared digest of the capture map of E/shard-3 is
+# corrupted. The one outcome is the loud stop of plan 3.4: nonzero exit, the
+# mismatch named, no answer printed, whatever the answer would have been. It
+# applies to every query whose artifact has the map in its ancestor closure, and to
+# the listing. A query about an artifact outside that closure prints its answer.
+# ==================================================================================
+
+[[row]]
+id = "c05.f.digest.src/A"
+question = "With the map digest of shard 3 corrupted, what does src/A answer under withdraw A?"
+plan = "5.5 Check 5; 2.2; 3.4"
+core = true
+given = { request = "withdraw A", artifact = "src/A", state = "f.digest" }
+expect = { answer = "contains" }
+source = "hand-written table: the fault is outside this artifact's ancestor closure; README section 9, reading 3"
+
+[[row]]
+id = "c05.f.digest.src/B"
+question = "With the map digest of shard 3 corrupted, what does src/B answer under withdraw A?"
+plan = "5.5 Check 5; 2.2; 3.4"
+core = true
+given = { request = "withdraw A", artifact = "src/B", state = "f.digest" }
+expect = { answer = "does not contain" }
+source = "hand-written table: the fault is outside this artifact's ancestor closure; README section 9, reading 3"
+
+[[row]]
+id = "c05.f.digest.src/C"
+question = "With the map digest of shard 3 corrupted, what does src/C answer under withdraw A?"
+plan = "5.5 Check 5; 2.2; 3.4"
+core = true
+given = { request = "withdraw A", artifact = "src/C", state = "f.digest" }
+expect = { answer = "does not contain" }
+source = "hand-written table: the fault is outside this artifact's ancestor closure; README section 9, reading 3"
+
+[[row]]
+id = "c05.f.digest.src/Z"
+question = "With the map digest of shard 3 corrupted, what does src/Z answer under withdraw A?"
+plan = "5.5 Check 5; 2.2; 3.4"
+core = true
+given = { request = "withdraw A", artifact = "src/Z", state = "f.digest" }
+expect = { answer = "does not contain" }
+source = "hand-written table: the fault is outside this artifact's ancestor closure; README section 9, reading 3"
+
+[[row]]
+id = "c05.f.digest.gen/P"
+question = "With the map digest of shard 3 corrupted, what does gen/P answer under withdraw A?"
+plan = "5.5 Check 5; 2.2; 3.4"
+core = true
+given = { request = "withdraw A", artifact = "gen/P", state = "f.digest" }
+expect = { answer = "contains" }
+source = "hand-written table: shard 3 is downstream of gen/P, not in its ancestor closure; README section 9, reading 3"
+
+[[row]]
+id = "c05.f.digest.gen/T"
+question = "With the map digest of shard 3 corrupted, what does gen/T answer under withdraw A?"
+plan = "5.5 Check 5; 2.2; 3.4"
+core = true
+given = { request = "withdraw A", artifact = "gen/T", state = "f.digest" }
+expect = { answer = "contains" }
+source = "hand-written table: shard 3 is downstream of gen/T, not in its ancestor closure; README section 9, reading 3"
+
+[[row]]
+id = "c05.f.digest.gen/S"
+question = "With the map digest of shard 3 corrupted, what does gen/S answer under withdraw A?"
+plan = "5.5 Check 5; 2.2; 3.4"
+core = true
+given = { request = "withdraw A", artifact = "gen/S", state = "f.digest" }
+expect = { answer = "contains" }
+source = "hand-written table: the fault is outside this artifact's ancestor closure; README section 9, reading 3"
+
+[[row]]
+id = "c05.f.digest.R1"
+question = "With the map digest of shard 3 corrupted, what does R1 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2; 3.4"
+core = true
+given = { request = "withdraw A", artifact = "R1", state = "f.digest" }
+expect = { answer = "contains" }
+source = "hand-written table: a release is not built from a shard; the fault is outside its ancestor closure; README section 9, reading 3"
+
+[[row]]
+id = "c05.f.digest.R2"
+question = "With the map digest of shard 3 corrupted, what does R2 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2; 3.4"
+core = true
+given = { request = "withdraw A", artifact = "R2", state = "f.digest" }
+expect = { answer = "does not contain" }
+source = "hand-written table: the fault is outside this artifact's ancestor closure; README section 9, reading 3"
+
+[[row]]
+id = "c05.f.digest.E/shard-1"
+question = "With the map digest of shard 3 corrupted, what does E/shard-1 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2; 3.4"
+core = true
+given = { request = "withdraw A", artifact = "E/shard-1", state = "f.digest" }
+expect = { answer = "does not contain" }
+source = "hand-written table: another shard's map is outside this artifact's ancestor closure; README section 9, reading 3"
+
+[[row]]
+id = "c05.f.digest.E/shard-2"
+question = "With the map digest of shard 3 corrupted, what does E/shard-2 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2; 3.4"
+core = true
+given = { request = "withdraw A", artifact = "E/shard-2", state = "f.digest" }
+expect = { answer = "does not contain" }
+source = "hand-written table: another shard's map is outside this artifact's ancestor closure; README section 9, reading 3"
+
+[[row]]
+id = "c05.f.digest.E/shard-3"
+question = "With its map digest corrupted, what happens to a query about E/shard-3 under withdraw A?"
+plan = "5.5 Check 5 (the corrupted digest); 2.2(d); 2.2 closing paragraph; 3.4"
+core = true
+given = { request = "withdraw A", artifact = "E/shard-3", state = "f.digest" }
+expect = { error = "map digest mismatch", exit_code = 3, stdout_empty = true }
+source = "hand-written table: a map whose digest does not match its artifact stops the query loudly; the shard would have answered \"contains\" and prints nothing"
+
+[[row]]
+id = "c05.f.digest.E/mix-1"
+question = "With the map digest of shard 3 corrupted, what does E/mix-1 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2; 3.4"
+core = true
+given = { request = "withdraw A", artifact = "E/mix-1", state = "f.digest" }
+expect = { answer = "does not contain" }
+source = "hand-written table: its snapshot names shards 1 and 2 only; README section 9, reading 3"
+
+[[row]]
+id = "c05.f.digest.E/mix-2"
+question = "With the map digest of shard 3 corrupted, what happens to a query about E/mix-2 under withdraw A?"
+plan = "5.5 Check 5; 2.2 closing paragraph; 3.4"
+core = true
+given = { request = "withdraw A", artifact = "E/mix-2", state = "f.digest" }
+expect = { error = "map digest mismatch", exit_code = 3, stdout_empty = true }
+source = "hand-written table: its snapshot names shard 3, so the faulted map is in its ancestor closure"
+
+[[row]]
+id = "c05.f.digest.D/mix-1"
+question = "With the map digest of shard 3 corrupted, what does D/mix-1 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2; 3.4"
+core = true
+given = { request = "withdraw A", artifact = "D/mix-1", state = "f.digest" }
+expect = { answer = "does not contain" }
+source = "hand-written table: its snapshot names shards 1 and 2 only; README section 9, reading 3"
+
+[[row]]
+id = "c05.f.digest.Y/mix-1"
+question = "With the map digest of shard 3 corrupted, what happens to a query about Y/mix-1 under withdraw A?"
+plan = "5.5 Check 5; 2.2 closing paragraph; 3.4"
+core = true
+given = { request = "withdraw A", artifact = "Y/mix-1", state = "f.digest" }
+expect = { error = "map digest mismatch", exit_code = 3, stdout_empty = true }
+source = "hand-written table: its snapshot names shard 3"
+
+[[row]]
+id = "c05.f.digest.K/mix-1"
+question = "With the map digest of shard 3 corrupted, what happens to a query about K/mix-1 under withdraw A?"
+plan = "5.5 Check 5; 2.2 closing paragraph; 3.4"
+core = true
+given = { request = "withdraw A", artifact = "K/mix-1", state = "f.digest" }
+expect = { error = "map digest mismatch", exit_code = 3, stdout_empty = true }
+source = "hand-written table: its snapshot names shard 3"
+
+[[row]]
+id = "c05.f.digest.E@6"
+question = "With the map digest of shard 3 corrupted, what does E@6 answer under withdraw A?"
+plan = "5.5 Check 5 (a \"does not contain\" where the fault does not touch the closure); 2.4; 3.4"
+core = true
+given = { request = "withdraw A", artifact = "E@6", state = "f.digest" }
+expect = { answer = "does not contain" }
+source = "hand-written table: its history is E/seg-1 on shards 1 and 2; shard 3 is in no part of it; README section 9, reading 3"
+
+[[row]]
+id = "c05.f.digest.E@9"
+question = "With the map digest of shard 3 corrupted, what happens to a query about E@9 under withdraw A?"
+plan = "5.5 Check 5; 2.2 closing paragraph (whatever the answer would have been); 3.4"
+core = true
+given = { request = "withdraw A", artifact = "E@9", state = "f.digest" }
+expect = { error = "map digest mismatch", exit_code = 3, stdout_empty = true }
+source = "hand-written table: E/seg-2 trains on shard 3; a loud fault is not a failed proof condition, so the recorded \"contains\" does not win here"
+
+[[row]]
+id = "c05.f.digest.D@3"
+question = "With the map digest of shard 3 corrupted, what happens to a query about D@3 under withdraw A?"
+plan = "5.5 Check 5; 2.2 closing paragraph; 3.4"
+core = true
+given = { request = "withdraw A", artifact = "D@3", state = "f.digest" }
+expect = { error = "map digest mismatch", exit_code = 3, stdout_empty = true }
+source = "hand-written table: D's history runs through E/seg-2, which trains on shard 3"
+
+[[row]]
+id = "c05.f.digest.Y@6"
+question = "With the map digest of shard 3 corrupted, what happens to a query about Y@6 under withdraw A?"
+plan = "5.5 Check 5; 2.2 closing paragraph; 3.4"
+core = true
+given = { request = "withdraw A", artifact = "Y@6", state = "f.digest" }
+expect = { error = "map digest mismatch", exit_code = 3, stdout_empty = true }
+source = "hand-written table: Y trains on shard 3 and its steps read documents of it (search condition 15); the checkpoint would have answered \"does not contain\" and prints nothing"
+
+[[row]]
+id = "c05.f.digest.K@3"
+question = "With the map digest of shard 3 corrupted, what happens to a query about K@3 under withdraw A?"
+plan = "5.5 Check 5; 2.2 closing paragraph; 3.4"
+core = true
+given = { request = "withdraw A", artifact = "K@3", state = "f.digest" }
+expect = { error = "map digest mismatch", exit_code = 3, stdout_empty = true }
+source = "hand-written table: K trains on shard 3 and its steps 1 to 3 read documents of it (search condition 21)"
+
+[[row]]
+id = "c05.f.digest.K@8"
+question = "With the map digest of shard 3 corrupted, what happens to a query about K@8 under withdraw A?"
+plan = "5.5 Check 5; 2.2 closing paragraph; 3.4"
+core = true
+given = { request = "withdraw A", artifact = "K@8", state = "f.digest" }
+expect = { error = "map digest mismatch", exit_code = 3, stdout_empty = true }
+source = "hand-written table: K trains on shard 3"
+
+[[row]]
+id = "c05.f.digest.K@40"
+question = "With the map digest of shard 3 corrupted, what happens to a query about K@40 under withdraw A?"
+plan = "5.5 Check 5; 2.2 closing paragraph; 3.4"
+core = true
+given = { request = "withdraw A", artifact = "K@40", state = "f.digest" }
+expect = { error = "map digest mismatch", exit_code = 3, stdout_empty = true }
+source = "hand-written table: K trains on shard 3"
+
+[[row]]
+id = "c05.f.digest.listing"
+question = "With the map digest of shard 3 corrupted, what happens to the listing under withdraw A?"
+plan = "5.5 Check 5; 2.1 Listings; 3.4"
+core = true
+given = { request = "withdraw A", artifact = "(listing)", state = "f.digest" }
+expect = { error = "map digest mismatch", exit_code = 3, stdout_empty = true }
+source = "hand-written table: the listing covers every artifact, so the faulted map is in what it walks"
+
+# ==================================================================================
+# B7. Fault f.label: the label of the capture map of E/shard-2 is set to
+# "observed"; its derivation (position) and verification (passed) stay. Condition
+# 2.2(f) fails for that map. The map exists, so the shard is not "not covered".
+# Every checkpoint's history runs through E/seg-1, whose steps read documents of
+# shard 2 (search condition 11).
+# ==================================================================================
+
+[[row]]
+id = "c05.f.label.src/A"
+question = "With the label of shard 2's map set to observed, what does src/A answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "src/A", state = "f.label" }
+expect = { answer = "contains" }
+source = "hand-written table: a shard's map is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.label.src/B"
+question = "With the label of shard 2's map set to observed, what does src/B answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "src/B", state = "f.label" }
+expect = { answer = "does not contain" }
+source = "hand-written table: a shard's map is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.label.src/C"
+question = "With the label of shard 2's map set to observed, what does src/C answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "src/C", state = "f.label" }
+expect = { answer = "does not contain" }
+source = "hand-written table: the fault is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.label.src/Z"
+question = "With the label of shard 2's map set to observed, what does src/Z answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "src/Z", state = "f.label" }
+expect = { answer = "does not contain" }
+source = "hand-written table: a shard's map is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.label.gen/P"
+question = "With the label of shard 2's map set to observed, what does gen/P answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "gen/P", state = "f.label" }
+expect = { answer = "contains" }
+source = "hand-written table: the fault is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.label.gen/T"
+question = "With the label of shard 2's map set to observed, what does gen/T answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "gen/T", state = "f.label" }
+expect = { answer = "contains" }
+source = "hand-written table: the fault is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.label.gen/S"
+question = "With the label of shard 2's map set to observed, what does gen/S answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "gen/S", state = "f.label" }
+expect = { answer = "contains" }
+source = "hand-written table: the fault is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.label.R1"
+question = "With the label of shard 2's map set to observed, what does R1 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "R1", state = "f.label" }
+expect = { answer = "contains" }
+source = "hand-written table: the fault is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.label.R2"
+question = "With the label of shard 2's map set to observed, what does R2 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "R2", state = "f.label" }
+expect = { answer = "does not contain" }
+source = "hand-written table: the fault is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.label.E/shard-1"
+question = "With the label of shard 2's map set to observed, what does E/shard-1 answer under withdraw A?"
+plan = "5.5 Check 5 (a \"does not contain\" where the fault does not touch the closure); 2.2"
+core = true
+given = { request = "withdraw A", artifact = "E/shard-1", state = "f.label" }
+expect = { answer = "does not contain" }
+source = "hand-written table: another shard's map is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.label.E/shard-2"
+question = "With the label of its map set to observed, what does E/shard-2 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2(f); 3.2 (a tokenization link can never be observed); 3.4"
+core = true
+given = { request = "withdraw A", artifact = "E/shard-2", state = "f.label" }
+expect = { answer = "may contain", names = "label stronger than derivation", failing = { condition = "f", artifact = "E/shard-2" } }
+source = "hand-written table: a position-derived map can carry \"recovered\", \"candidates\" or \"unknown\" only; a stronger label fails condition (f). The map exists, so the answer is \"may contain\" and not \"not covered\" (2.1)"
+
+[[row]]
+id = "c05.f.label.E/shard-3"
+question = "With the label of shard 2's map set to observed, what does E/shard-3 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2"
+core = true
+given = { request = "withdraw A", artifact = "E/shard-3", state = "f.label" }
+expect = { answer = "contains" }
+source = "hand-written table: another shard's map is outside this artifact's ancestor closure; the unmutated answer stands"
+
+[[row]]
+id = "c05.f.label.E/mix-1"
+question = "With the label of shard 2's map set to observed, what does E/mix-1 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2(f)"
+core = true
+given = { request = "withdraw A", artifact = "E/mix-1", state = "f.label" }
+expect = { answer = "may contain", names = "label stronger than derivation", failing = { condition = "f", artifact = "E/shard-2" } }
+source = "hand-written table: the mixture holds shard 2, whose map fails condition (f); no chain shows \"contains\""
+
+[[row]]
+id = "c05.f.label.E/mix-2"
+question = "With the label of shard 2's map set to observed, what does E/mix-2 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2 closing paragraph (for a mixture, a shard or a checkpoint alike); Decision 20"
+core = true
+given = { request = "withdraw A", artifact = "E/mix-2", state = "f.label" }
+expect = { answer = "contains" }
+source = "hand-written table: the chain through shard 3 to T is recorded and untouched; a recorded \"contains\" wins (Decision 20)"
+
+[[row]]
+id = "c05.f.label.D/mix-1"
+question = "With the label of shard 2's map set to observed, what does D/mix-1 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2(f)"
+core = true
+given = { request = "withdraw A", artifact = "D/mix-1", state = "f.label" }
+expect = { answer = "may contain", names = "label stronger than derivation", failing = { condition = "f", artifact = "E/shard-2" } }
+source = "hand-written table: the mixture holds shard 2, whose map fails condition (f)"
+
+[[row]]
+id = "c05.f.label.Y/mix-1"
+question = "With the label of shard 2's map set to observed, what does Y/mix-1 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2 closing paragraph; Decision 20"
+core = true
+given = { request = "withdraw A", artifact = "Y/mix-1", state = "f.label" }
+expect = { answer = "contains" }
+source = "hand-written table: the chain through shard 3 to T is recorded and untouched; a recorded \"contains\" wins (Decision 20)"
+
+[[row]]
+id = "c05.f.label.K/mix-1"
+question = "With the label of shard 2's map set to observed, what does K/mix-1 answer under withdraw A?"
+plan = "5.5 Check 5; 2.2 closing paragraph; Decision 20"
+core = true
+given = { request = "withdraw A", artifact = "K/mix-1", state = "f.label" }
+expect = { answer = "contains" }
+source = "hand-written table: K's mixture holds shard 2 and shard 3; the chain through shard 3 to T is untouched; a recorded \"contains\" wins (Decision 20)"
+
+[[row]]
+id = "c05.f.label.E@6"
+question = "With the label of shard 2's map set to observed, what does E@6 answer under withdraw A?"
+plan = "5.5 Check 5; 2.4 (a record its steps consumed fails a condition); 2.2(f)"
+core = true
+given = { request = "withdraw A", artifact = "E@6", state = "f.label" }
+expect = { answer = "may contain", names = "label stronger than derivation", failing = { condition = "f", artifact = "E/shard-2" } }
+source = "hand-written table: its steps read documents of shard 2 (search condition 11), and the map that ties them to records fails condition (f)"
+
+[[row]]
+id = "c05.f.label.E@9"
+question = "With the label of shard 2's map set to observed, what does E@9 answer under withdraw A?"
+plan = "5.5 Check 5; 2.4; Decision 20"
+core = true
+given = { request = "withdraw A", artifact = "E@9", state = "f.label" }
+expect = { answer = "contains", first_exposure = { segment = "E/seg-2", step = 7 } }
+source = "hand-written table: the read of T at step 7 goes through shard 3's map; a recorded \"contains\" wins (Decision 20)"
+
+[[row]]
+id = "c05.f.label.D@3"
+question = "With the label of shard 2's map set to observed, what does D@3 answer under withdraw A?"
+plan = "5.5 Check 5; 2.4; Decision 20"
+core = true
+given = { request = "withdraw A", artifact = "D@3", state = "f.label" }
+expect = { answer = "contains" }
+source = "hand-written table: its ancestor E@9 still answers \"contains\" (2.4)"
+
+[[row]]
+id = "c05.f.label.Y@6"
+question = "With the label of shard 2's map set to observed, what does Y@6 answer under withdraw A?"
+plan = "5.5 Check 5; 2.4; 2.2(f)"
+core = true
+given = { request = "withdraw A", artifact = "Y@6", state = "f.label" }
+expect = { answer = "may contain", failing = { condition = "f", artifact = "E/shard-2" } }
+source = "hand-written table: Y's history runs through E/seg-1, whose steps read documents of shard 2 (search condition 11)"
+
+[[row]]
+id = "c05.f.label.K@3"
+question = "With the label of shard 2's map set to observed, what does K@3 answer under withdraw A?"
+plan = "5.5 Check 5; 2.4; 2.2(f)"
+core = true
+given = { request = "withdraw A", artifact = "K@3", state = "f.label" }
+expect = { answer = "may contain", failing = { condition = "f", artifact = "E/shard-2" } }
+expect_under = { cyclic-wrapper-route = { answer = "may contain" } }
+source = "hand-written table: K starts from E@6, whose steps read documents of shard 2 (search condition 11)"
+
+[[row]]
+id = "c05.f.label.K@8"
+question = "With the label of shard 2's map set to observed, what does K@8 answer under withdraw A?"
+plan = "5.5 Check 5; 2.4; Decision 20"
+core = true
+given = { request = "withdraw A", artifact = "K@8", state = "f.label" }
+expect = { answer = "contains" }
+expect_under = { cyclic-wrapper-route = { answer = "may contain" } }
+source = "hand-written table: K's own read of T goes through shard 3's map; a recorded \"contains\" wins (Decision 20)"
+
+[[row]]
+id = "c05.f.label.K@40"
+question = "With the label of shard 2's map set to observed, what does K@40 answer under withdraw A?"
+plan = "5.5 Check 5; 2.4; Decision 20"
+core = true
+given = { request = "withdraw A", artifact = "K@40", state = "f.label" }
+expect = { answer = "contains" }
+expect_under = { cyclic-wrapper-route = { answer = "may contain" } }
+source = "hand-written table: K's own read of T goes through shard 3's map; a recorded \"contains\" wins (Decision 20)"
+
+# ==================================================================================
+# C1. A record-level request about B, with an observed link to A and a file-level
+# link to B (plan 5.5 Check 5; 2.2(b); Decision 3).
+# The state: P in gen/P keeps its observed edge to X@A. Through the write API one
+# source link is added from P's occurrence to the member B/r1, label "file-level"
+# (set-up s.file-level-link-B). The request names the one record X@B of source B.
+# ==================================================================================
+
+[[row]]
+id = "c05.record-X@B.unmutated.gen/P"
+question = "Before the file-level link is added, what does gen/P answer for the record X@B of source B?"
+plan = "5.5 Check 5; 2.2(g); 2.1"
+core = true
+given = { request = "withdraw B, record X@B", artifact = "gen/P", state = "unmutated" }
+expect = { answer = "does not contain", notes = ["generating-model exposure not assessed"] }
+source = "hand-written table: P's edge names X@A only and its upper bound is established, so the proof passes a generation edge for a source it does not name and carries the words of 2.2(h) for the off state"
+
+[[row]]
+id = "c05.record-X@B.file-level-link.gen/P"
+question = "With an observed link to A and a file-level link to B on P, what does gen/P answer for the record X@B of source B?"
+plan = "5.5 Check 5; 2.2(b); 3.2; Decision 3"
+core = true
+given = { request = "withdraw B, record X@B", artifact = "gen/P", state = "s.file-level-link-B" }
+expect = { answer = "may contain", names = "evidence level cannot decide the request", failing = { condition = "b", artifact = "gen/P", record = "P" } }
+source = "hand-written table: evidence levels are kept per (occurrence, requested source); the observed link to A never masks the file-level link to B, and a file-level link cannot decide a record-level request (2.2(b), 3.2)"
+
+# ==================================================================================
+# C2. "withdraw C" (plan 5.5 Check 5; 2.2(g); Decisions 13 and 25)
+# ==================================================================================
+
+[[row]]
+id = "c05.withdraw-C.unmutated.E/shard-3"
+question = "Under withdraw C, unmutated, what does shard 3 answer?"
+plan = "5.5 Check 5; 2.2(g); 2.2(h) off state; 2.1; L8"
+core = true
+given = { request = "withdraw C", artifact = "E/shard-3", state = "unmutated" }
+expect = { answer = "does not contain", notes = ["generating-model exposure not assessed"], scope = { source = "C", members = ["C/r1"], generation_edges = ["translation", "paraphrase"] } }
+source = "hand-written table: T runs through P to X@A and no edge on that chain names C; both generation edges have their upper bound established, and the proof lists them (L8). With the generating-model extension off the answer says what was not assessed"
+
+[[row]]
+id = "c05.withdraw-C.unmutated.R1"
+question = "Under withdraw C, unmutated, what does R1 answer?"
+plan = "5.5 Check 5; 2.1; Decision 25"
+core = true
+given = { request = "withdraw C", artifact = "R1", state = "unmutated" }
+expect = { answer = "contains", chain = ["R1:S", "gen/S:S", "src/C:SC"], notes = ["the parent list is process evidence (what the harness handed the job and what the output states it used), not proof that the output depends on the source"] }
+source = "hand-written table: R1 holds S, and S states its use of C's passage SC; the chain passes a generation edge, so the answer carries the process-evidence note (2.1)"
+
+[[row]]
+id = "c05.g.bound-field.E/shard-3"
+question = "With the upper bound of P's generation edge marked not established, what does shard 3 answer under withdraw C?"
+plan = "5.5 Check 5; 2.2(g); 3.3; Decision 13; L8"
+core = true
+given = { request = "withdraw C", artifact = "E/shard-3", state = "g.bound-field" }
+expect = { answer = "may contain", names = "upper bound not established", failing = { condition = "g", job = "paraphrase" } }
+source = "hand-written table: a negative for a source an edge does not name needs that edge's established bound; without it the answer is \"may contain\" naming the job (2.2(g))"
+
+[[row]]
+id = "c05.g.log-outside-read.E/shard-3"
+question = "With a read of a record outside its hand-off added to the stored log of P's job, what does shard 3 answer under withdraw C?"
+plan = "5.5 Check 5; 2.2(g); 3.3; Decision 13; L8"
+core = true
+given = { request = "withdraw C", artifact = "E/shard-3", state = "g.log-outside-read" }
+expect = { answer = "may contain", names = "upper bound not established", failing = { condition = "g", job = "paraphrase" } }
+source = "hand-written table: the bound is read from the stored log, which now lists a record beyond the handed ones, so it is not established (3.3)"
+
+[[row]]
+id = "c05.g.log-removed.E/shard-3"
+question = "With the harness log of P's edge removed and its bound field left at established, what does shard 3 answer under withdraw C?"
+plan = "5.5 Check 5; 2.2(g) (never from a bound field alone); 3.1 (Edge)"
+core = true
+given = { request = "withdraw C", artifact = "E/shard-3", state = "g.log-removed" }
+expect = { answer = "may contain", names = "upper bound not established", failing = { condition = "g", job = "paraphrase" } }
+source = "hand-written table: the bound is established only from the edge's stored harness log; a field that says established with no log behind it is not a bound (2.2(g))"
+
+[[row]]
+id = "c05.g.model-entry-removed.on.E/shard-3"
+question = "With the generating-model rule on and the model entry removed from the stored log of P's job, what does shard 3 answer under withdraw C?"
+plan = "5.5 Check 5 (extension row); 2.2(h); 3.3; L11"
+core = false
+extension = "generating-model"
+given = { request = "withdraw C", artifact = "E/shard-3", state = "g.model-entry-removed", extensions_on = ["generating-model"] }
+expect = { answer = "may contain", names = "generating-model entry missing", failing = { condition = "h", job = "paraphrase" } }
+source = "hand-written table: a log with no model entry is read as not established, never as no model; the answer names the job and the missing model entry (2.2(h))"
+
+[[row]]
+id = "c05.g.model-entry-removed.off.E/shard-3"
+question = "With the generating-model rule off and the model entry removed from the stored log of P's job, what does shard 3 answer under withdraw C?"
+plan = "1.4 (while it is off); 2.2(h); 3.3"
+core = true
+given = { request = "withdraw C", artifact = "E/shard-3", state = "g.model-entry-removed" }
+expect = { answer = "does not contain", notes = ["generating-model exposure not assessed"] }
+source = "hand-written table: while the extension is off the model is a logged attribute and condition (h) is not applied; the reads of the log are unchanged, so the bound stands and the unmutated answer stands. This row is the off state of the extension row above"
+
+[[row]]
+id = "c05.s.in-scope-only.R1"
+question = "With C's passage marked as in scope only in S's edge, what does R1 answer under withdraw C?"
+plan = "5.5 Check 5; 2.2(g); 3.3; Decision 25"
+core = true
+given = { request = "withdraw C", artifact = "R1", state = "s.in-scope-only" }
+expect = { answer = "may contain", names = "in scope only", failing = { condition = "g", job = "summary", record = "SC" } }
+source = "hand-written table: a record handed to the job and not stated as used is not a parent; a source an edge names only in scope gives \"may contain\", never \"contains\" (Decision 25). R1 holds no other record of C"
+
+# ==================================================================================
+# C3. The harness, the unregistered checkpoint, the listing
+# ==================================================================================
+
+[[row]]
+id = "c05.harness.outside-read"
+question = "When the stand-in job tries to read a record outside its hand-off, does the harness refuse the read and does its log show the attempt?"
+plan = "5.5 Check 5; 3.3 (Generation); F10"
+core = true
+given = { state = "h.outside-read", job = "paraphrase", handed = ["X@A"], asks_for = "X@B" }
+expect = { read_refused = true, text_returned = false, log_shows_attempt = true, log_entry = { outside_ref = "X@B", refused = true } }
+source = "hand-written table: the job can reach no record but the handed ones, and the access log lists every read it tried (3.3, F10)"
+
+[[row]]
+id = "c05.unregistered-checkpoint"
+question = "What does a query naming a checkpoint that was never registered answer?"
+plan = "5.5 Check 5; 2.1; 2.4; L10; Decision 21"
+core = true
+given = { request = "withdraw A", artifact = "E@12", state = "q.unregistered" }
+expect = { answer = "not covered", reason = "not registered" }
+source = "hand-written table: the store has never been told of it; a query about an unregistered artifact gets this answer and never a partial one (2.1)"
+
+[[row]]
+id = "c05.listing.map-deleted"
+question = "With the map of shard 1 deleted, does the listing under withdraw A name what it covers and list shard 1 as not covered instead of omitting it?"
+plan = "5.5 Check 5; 2.1 Listings; Decision 26; L10"
+core = true
+given = { request = "withdraw A", artifact = "(listing)", state = "f.map-deleted" }
+expect = { covers = { runs = ["E", "D", "Y", "K"], mixtures = ["E/mix-1", "E/mix-2", "D/mix-1", "Y/mix-1", "K/mix-1"], shards = ["E/shard-2", "E/shard-3"], checkpoints = ["E@6", "E@9", "D@3", "Y@6", "K@3", "K@8", "K@40"], releases = ["R1", "R2"] }, not_covered = [ { artifact = "E/shard-1", reason = "record missing" } ] }
+source = "hand-written table: mixture snapshots name shard 1 and it has no record of its own, so the listing lists it as \"not covered\" (Decision 26). Each list is compared as a set; the answers the listing prints are the rows c05.f.map-deleted.*"
+[[row]]
+id = "c05.g.model-entry-removed.on.gen/P"
+question = "With the generating-model rule on and the model entry removed from the stored log of P's job, what does gen/P answer under withdraw C?"
+plan = "5.5 Check 5 (extension row); 2.2(h); 3.3; L11"
+core = false
+extension = "generating-model"
+given = { request = "withdraw C", artifact = "gen/P", state = "g.model-entry-removed", extensions_on = ["generating-model"] }
+expect = { answer = "may contain", names = "generating-model entry missing", failing = { condition = "h", job = "paraphrase" } }
+source = "hand-written table: P is the output of the job paraphrase, which was handed and used A-001 only, so C is a source its edge does not name and condition (h) applies to it; the state removes the model entry of that job's log, and a log with no model entry is read as not established, never as no model: the answer names the job and the missing model entry (2.2(h): \"for a source that edge does not name ... where the log has no model entry, the job and the missing model entry\"; L11)"
+
+[[row]]
+id = "c05.g.model-entry-removed.on.gen/T"
+question = "With the generating-model rule on and the model entry removed from the stored log of P's job, what does gen/T answer under withdraw C?"
+plan = "5.5 Check 5 (extension row); 2.2(h); 3.3; L11"
+core = false
+extension = "generating-model"
+given = { request = "withdraw C", artifact = "gen/T", state = "g.model-entry-removed", extensions_on = ["generating-model"] }
+expect = { answer = "may contain", names = "generating-model entry missing", failing = { condition = "h", job = "paraphrase" } }
+source = "hand-written table: T is the output of the job translation, which was handed and used P, so T is answered from its whole ancestor closure (2.2; L11); the state removes the model entry of the log of the job paraphrase and of no other job, so the edge of P is the link that fails and the answer names the job paraphrase with its missing model entry (2.2: \"any failed condition gives \"may contain\" naming the first failing link\")"
+
+# E2 row 9 (draft id, named by the table writer): the standing negative with the switch on.
+
+[[row]]
+id = "c05.withdraw-C.on.E/shard-3"
+question = "With the generating-model rule on, under withdraw C, unmutated, what does shard 3 answer?"
+plan = "5.5 Check 5 (extension row); 2.2(h); 3.3; L8"
+core = false
+extension = "generating-model"
+given = { request = "withdraw C", artifact = "E/shard-3", state = "unmutated", extensions_on = ["generating-model"] }
+expect = { answer = "does not contain", notes = [] }
+source = "hand-written table: with the generating-model rule on, every model of the chain of T and P recorded as none, no edge on the chain names C and both generation edges have their upper bound established, so the answer stands and the exposure note is absent; the same question with the rule off is table row c05.withdraw-C.unmutated.E/shard-3, whose answer is the same and whose note says what was not assessed (notes is compared as a set)"

@@ -1,0 +1,180 @@
+# Check 6, missing evidence (plan 5.5 Check 6). Written by hand before the tool exists.
+# Conventions and the stores "no-capture" and "import": README.md.
+#
+# The generated sets take their expected values from the plant list, counted by the
+# counting script; those rows name the script's output in words. The fixture's rows
+# are written here by hand.
+#
+# Under fallback F1 the maps are recovered by token matching instead of position
+# mode; the expected answers are the same and the result is reported with the
+# fallback.
+
+# ---------------------------------------------------------------------------------
+# The generated sets
+# ---------------------------------------------------------------------------------
+
+[[row]]
+id = "c06.generated.documents-mapped"
+question = "On a generated set made without capture and recovered in position mode, is every tokenized document mapped to its occurrence or to its set of identical candidates?"
+plan = "5.5 Check 6; 3.3 (Tokenization, recovery)"
+core = true
+given = { set = "generated", store = "no-capture", map = "position recovery" }
+expect = { per_ordinal = "one recovered occurrence, or the candidate set of an identical pair in the same shard", unmapped_documents = 0 }
+expect_under = { F1 = { per_ordinal = "one recovered occurrence, or the candidate set of an identical pair in the same shard", unmapped_documents = 0, map_built_by = "token-matching" } }
+source = "the plant list, counted by the counting script: per shard, the planted record of each surviving chunk-file line, and the list of same-shard identical pairs"
+
+[[row]]
+id = "c06.generated.drops"
+question = "Is every skipped line, and every line that gives no tokens, accounted for as a drop?"
+plan = "5.5 Check 6; 3.3; F1"
+core = true
+given = { set = "generated", store = "no-capture", map = "position recovery" }
+expect = { drops = "one per planted skipped line and empty line of the sanitizer's log, each with its reason", reasons = ["sanitizer skip", "empty line"], drops_with_reason_no_tokens = 0, ordinals_shifted = 0 }
+expect_under = { F1 = { drops = "one per planted skipped line and empty line of the sanitizer's log, each with its reason", reasons = ["sanitizer skip", "empty line"], drops_with_reason_no_tokens = 0, map_built_by = "token-matching" } }
+source = "the plant list, counted by the counting script: for the release, the list of lines the sanitizer must log as drops, each with its reason, and per shard the number of surviving lines; the chunk each skipped line was read in is the sanitizer's log's (the replica's records). The sets plant no surviving line that gives no tokens (docs/plant.md, section 8), so the expected number of such drops is zero; the planted case is the row c03.drops.no-tokens.planted-line, which asks the position-mode recovery map too"
+
+[[row]]
+id = "c06.generated.candidates"
+question = "Where a copy step was unobserved and identical texts came from different origins, are those records reported as \"candidates\" with their sources named?"
+plan = "5.5 Check 6; 3.2; 3.3 (Copy steps); L3"
+core = true
+given = { set = "generated", store = "no-capture" }
+expect = { label = "candidates", candidate_sources = "the sources of the pair's members, as the plant list names them", answer_for_each_candidate_source = "may contain" }
+source = "the plant list, counted by the counting script: the list of identical-record pairs across sources, each with the sources of its two members"
+
+[[row]]
+id = "c06.generated.downstream-of-translation"
+question = "Is everything downstream of an unrecorded translation \"may contain\" and never \"does not contain\"?"
+plan = "5.5 Check 6; 2.2(a); 2.3; L5"
+core = true
+given = { set = "generated", store = "no-capture", request = "withdraw A" }
+expect = { answer = "may contain", never = ["does not contain"] }
+source = "the plant list, counted by the counting script: the list of planted translations and, from the chunk-file ids, the releases and shards that receive each"
+
+# ---------------------------------------------------------------------------------
+# The fixture, made without capture (store "no-capture")
+# ---------------------------------------------------------------------------------
+
+[[row]]
+id = "c06.fixture.documents-mapped.E/shard-1"
+question = "In the no-capture build, is every document of shard 1 mapped to its occurrence?"
+plan = "5.5 Check 6; 3.3 (position mode recovery)"
+core = true
+given = { store = "no-capture", artifact = "E/shard-1", map = "position recovery" }
+expect = { documents = 18, recovered = 18, candidates = 0, unknown = 0, derivation = "position", verification = "passed" }
+expect_under = { F1 = { documents = 18, recovered = 18, candidates = 0, unknown = 0, derivation = "token-matching", verification = "passed" } }
+source = "hand-written table: the spec gives shard 1 six records of B and twelve of Z; no two of its documents hold the same text, so none is a twin"
+
+[[row]]
+id = "c06.fixture.documents-mapped.E/shard-2"
+question = "In the no-capture build, is every document of shard 2 mapped to its occurrence, with the skipped line shifting no ordinal?"
+plan = "5.5 Check 6; 3.3 (position mode recovery reads sanitizer skips as drops)"
+core = true
+given = { store = "no-capture", artifact = "E/shard-2", map = "position recovery" }
+expect = { documents = 19, recovered = 19, candidates = 0, unknown = 0, derivation = "position", verification = "passed" }
+expect_under = { F1 = { documents = 19, recovered = 19, candidates = 0, unknown = 0, derivation = "token-matching", verification = "passed" } }
+source = "hand-written table: the spec gives shard 2 seven records of B and twelve of Z; the skipped line is no document"
+
+[[row]]
+id = "c06.fixture.documents-mapped.E/shard-3"
+question = "In the no-capture build, is every document of shard 3 mapped to its occurrence?"
+plan = "5.5 Check 6; 3.3 (position mode recovery)"
+core = true
+given = { store = "no-capture", artifact = "E/shard-3", map = "position recovery" }
+expect = { documents = 27, recovered = 27, candidates = 0, unknown = 0, derivation = "position", verification = "passed" }
+expect_under = { F1 = { documents = 27, recovered = 27, candidates = 0, unknown = 0, derivation = "token-matching", verification = "passed" } }
+source = "hand-written table: the spec gives shard 3 the record T and 26 records of Z; the count moves with the spec if the seed search enlarges shard 3"
+
+[[row]]
+id = "c06.fixture.drops"
+question = "In the no-capture build, are the skipped line and every line that gives no tokens accounted for as drops?"
+plan = "5.5 Check 6; 3.1 (Drop); 3.3; F1"
+core = true
+given = { store = "no-capture" }
+expect = { drops = [ { input_of = "E/shard-2", line = 6, reason = "sanitizer skip" } ], empty_line_drops = 0, no_tokens_drops = 0 }
+source = "hand-written table: the spec plants one unparseable line (sanitizer_skip) and no empty line or line without tokens"
+
+[[row]]
+id = "c06.fixture.candidates.X"
+question = "In the no-capture build, how is the row of R1 that holds the passage X linked?"
+plan = "5.5 Check 6; 3.2 (candidates); 3.3 (Copy steps); L3"
+core = true
+given = { store = "no-capture", artifact = "R1", record = "X" }
+expect = { label = "candidates", candidates = ["A", "B"] }
+source = "hand-written table: with the dedup step unobserved, the row's text equals X@A and X@B, two records of different sources, and no rule can tell which one it came from (L3)"
+
+[[row]]
+id = "c06.fixture.downstream.gen/T"
+question = "In the no-capture build, what does the file that holds T answer under withdraw A?"
+plan = "5.5 Check 6; 2.2(a); 2.3; L5"
+core = true
+given = { store = "no-capture", request = "withdraw A", artifact = "gen/T" }
+expect = { answer = "may contain", names = "missing origin", failing = { condition = "a", artifact = "gen/T", record = "T" } }
+source = "hand-written table: the translation was never recorded and a generation's parent is never recovered by similarity (L5), so T's chain does not reach an ingested revision"
+
+[[row]]
+id = "c06.fixture.downstream.R1"
+question = "In the no-capture build, what does R1 answer under withdraw A?"
+plan = "5.5 Check 6; 2.2(a); 3.2; L3; L5"
+core = true
+given = { store = "no-capture", request = "withdraw A", artifact = "R1" }
+expect = { answer = "may contain", never = ["does not contain", "contains"] }
+source = "hand-written table: its row X has candidate parents in A and B, and its rows P, T and S have no recorded origin; no chain shows \"contains\" and no proof can hold"
+
+[[row]]
+id = "c06.fixture.downstream.E/shard-3"
+question = "In the no-capture build, what does shard 3 answer under withdraw A?"
+plan = "5.5 Check 6; 2.2(a); 2.3"
+core = true
+given = { store = "no-capture", request = "withdraw A", artifact = "E/shard-3" }
+expect = { answer = "may contain", names = "missing origin", never = ["does not contain"] }
+source = "hand-written table: the shard's map is recovered and whole, so the shard is covered; its document T has no recorded origin; its 26 other documents are unique texts of Z and recover to one parent each"
+
+# ---------------------------------------------------------------------------------
+# The text-only import of T (store "import")
+# ---------------------------------------------------------------------------------
+
+[[row]]
+id = "c06.import.file-family"
+question = "For the text-only import of T, is the file family reported?"
+plan = "5.5 Check 6; 3.2 (file-level); 5.1; L1"
+core = true
+given = { store = "import", artifact = "import/T" }
+expect = { link = { member = "A/r1", label = "file-level", evidence = "file family: translations made from source A" } }
+source = "hand-written table: the spec registers the import with the file family A/r1 and this evidence text"
+
+[[row]]
+id = "c06.import.withdraw-A"
+question = "Under withdraw A, what does the import answer as a file?"
+plan = "5.5 Check 6; 3.2 (file-level decides requests about the whole file or source); L1; 4.6"
+core = true
+given = { store = "import", request = "withdraw A", artifact = "import/T", state = "unmutated" }
+expect = { answer = "contains", notes = [] }
+source = "hand-written table: the request is about the whole source and the file is known to derive from it, so the tool answers at the recorded level (L1); no generation edge is recorded, so no note. README section 9, reading 4"
+
+[[row]]
+id = "c06.import.record-request"
+question = "For the record X@A alone, what does the import answer?"
+plan = "5.5 Check 6; 2.2(b); 3.2; L1"
+core = true
+given = { store = "import", request = "withdraw A, record X@A", artifact = "import/T", state = "unmutated" }
+expect = { answer = "may contain", names = "evidence level cannot decide the request", failing = { condition = "b", artifact = "import/T", record = "T" } }
+source = "hand-written table: which item of A the record came from was never recorded; a file-level link cannot decide a request narrowed to a record"
+
+[[row]]
+id = "c06.import.parent-unresolved"
+question = "For the request narrowed to the record X@A, which link does the answer for the import name as the missing one, and which source does it list as a candidate?"
+plan = "5.5 Check 6; 2.1 (a \"may contain\" names the first failing link and lists the candidate sources); 3.2 (file-level); L1; L5"
+core = true
+given = { store = "import", request = "withdraw A, record X@A", artifact = "import/T", state = "unmutated" }
+expect = { answer = "may contain", failing = { condition = "b", artifact = "import/T", record = "T" }, candidates = ["A"] }
+source = "hand-written table: no parent is recorded for T, since the tool cannot know which item of A it came from (L1) and never recovers a generation's parent by similarity (L5); the answer names the first link that fails, which sits on the record T of import/T (the link of c06.import.record-request), and lists the candidate sources, here the one source of the file family A/r1. The answer form has no field for a parent: the record the failing link names is the closest field, and the candidates field holds the source"
+
+[[row]]
+id = "c06.import.review-scope"
+question = "In the rebuild report under withdraw A, what action does the record T of the import get, with which missing link, and which scope needs review?"
+plan = "5.5 Check 6; 4.1 (a record whose answer is \"may contain\" has no action; the report lists it as unresolved with the missing link); L1"
+core = true
+given = { store = "import", request = "withdraw A", artifact = "import/T", record = "T", state = "unmutated" }
+expect = { action = "unresolved", missing_link = "the record's own parent; only the file-level link to A/r1 is recorded", review_scope = { artifact = "import/T", records = "every record of the file", count = 1 } }
+source = "hand-written table: the action, the missing link and the scope needing review are fields of the rebuild report (plan 4.1), not of the answer, so the table's reader skips this row until the report exists; the evidence is for the file as a whole, so the whole file is what a person must review, and it holds one record"

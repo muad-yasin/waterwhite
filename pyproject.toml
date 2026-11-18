@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "waterwhite"
+version = "0.1.0.dev0"
+description = "Traces training data into mixtures and checkpoints, and plans the rebuild after a source is withdrawn."
+license = { text = "MIT" }
+requires-python = ">=3.12"
+dependencies = ["numpy>=2"]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+# Needed only to register a run read with the cyclic sampler that recorded its
+# shuffle digests: the join computes each epoch's shuffle as the sampler draws it.
+cyclic = ["torch"]
+
+[project.scripts]
+waterwhite = "waterwhite.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+waterwhite = ["store/*.sql"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "."]
+markers = [
+    "megatron: needs the test-time Megatron environment (tools/setup_megatron_env.sh)",
+    "slow: longer than a few seconds; run at a milestone's end or in the full suite",
+]

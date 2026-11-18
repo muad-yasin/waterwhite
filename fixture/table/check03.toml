@@ -1,0 +1,170 @@
+# Check 3, tokenization links (plan 5.5 Check 3). Written by hand before the tool exists.
+# Conventions: README.md.
+#
+# Check 3 runs on the 100k generated set in the round-robin layout (20 chunks, each
+# tokenized into one shard, the dedup step switched off). Its expected values are
+# not in this table: they come from the plant list and the other outside sources
+# the plan names. Each row says which source gives the value and names, in words,
+# the output of the counting script (spec, where.plant_counting_script) that
+# holds it. The script is written before the tool exists and shares no code with it.
+#
+# Under fallback F1 the position-mode questions do not apply, the wrapper-written
+# map is built by token matching, and the check passes if every question that mode
+# faces is answered yes.
+#
+# The three maps of one shard (the capture map, the position-mode recovery map and
+# the token-matching recovery map) are held side by side in one store: a binding is
+# unique per shard, namespace and derivation mode, and the later recovery does not
+# replace the earlier one (DECISIONS.md D-20). A row that names several maps asks
+# its question of each of them on that one store.
+#
+# The generated sets hold no surviving line that gives no tokens (docs/plant.md,
+# section 8): every line the sets plant to be skipped is dropped by the sanitizer,
+# and the fixture's tokenizer gives at least one token for any text that is not
+# empty. The question about such a line is therefore asked twice: on the set, where
+# the expected number is zero, and on a small scratch input that holds one such
+# line (set-up t.no-tokens-line, README.md section 7).
+
+[[row]]
+id = "c03.precondition.eod-convention"
+question = "Is the end-of-document convention recorded in the fixture spec from the oracle's output on the hand-checked fixture before the check runs?"
+plan = "5.5 Check 3; 3.3 (Tokenization); F1"
+core = true
+given = { set = "100k", layout = "round-robin" }
+expect = { spec_key = "tokenizer.eod_in_span", value = "pending:tokenizer.eod_in_span" }
+source = "the oracle's log: its output on the hand-checked fixture, recorded in the spec (pending item tokenizer.eod_in_span)"
+
+[[row]]
+id = "c03.precondition.pair-kinds"
+question = "Does the plant list hold at least one identical pair placed in one shard and at least one split across two shards?"
+plan = "5.5 Check 3; 5.1 (the plant list)"
+core = true
+given = { set = "100k", layout = "round-robin" }
+expect = { same_shard_pairs_at_least = 1, split_pairs_at_least = 1 }
+source = "the plant list, counted by the counting script: the list of planted identical pairs, each classified as same-shard or split from the ids of the chunk-file lines after chunking"
+
+[[row]]
+id = "c03.spans.per-ordinal"
+question = "For every ordinal of every shard, is token end minus token start equal to that document's size in the shard's own index under the recorded convention?"
+plan = "5.5 Check 3; 3.3 (verification)"
+core = true
+given = { set = "100k", layout = "round-robin", map = "capture" }
+expect = { per_ordinal = "token_end - token_start equals the document's size in the shard's index", mismatches = 0 }
+source = "the replica's records: the shard's own index file, read under the convention of tokenizer.eod_in_span; no counting-script field is needed"
+
+[[row]]
+id = "c03.spans.total"
+question = "Does the sum of the spans of a shard's map equal the total of the shard's index?"
+plan = "5.5 Check 3; 3.3 (verification)"
+core = true
+given = { set = "100k", layout = "round-robin", map = "capture" }
+expect = { per_shard = "sum of spans equals the index total", mismatches = 0 }
+source = "the replica's records: the shard's own index file"
+
+[[row]]
+id = "c03.drops.sanitizer"
+question = "Does every sanitizer-skipped or empty line appear as a drop, without shifting any ordinal?"
+plan = "5.5 Check 3; 3.3; 3.1 (Drop)"
+core = true
+given = { set = "100k", layout = "round-robin", map = "capture" }
+expect = { drops = "one drop per skipped or empty line of the sanitizer's log, with its reason", reasons = ["sanitizer skip", "empty line"], documents_per_shard = "the number of surviving lines of the shard's input" }
+expect_under = { F1 = { drops = "one drop per skipped or empty line of the sanitizer's log, with its reason", reasons = ["sanitizer skip", "empty line"], map_built_by = "token-matching" } }
+source = "the replica's records: the sanitizer's log, which says in which chunk and at which place each skipped line was read; and the plant list, counted by the counting script: for the release, the list of lines the sanitizer must log as drops, each with its id, its reason (\"sanitizer skip\" for an unparseable line, \"empty line\" for a text that is empty after normalisation) and the digest of its raw line, and per shard the number of surviving lines"
+
+[[row]]
+id = "c03.drops.no-tokens"
+question = "On the 100k set, is no document reported as a drop for giving no tokens, and does each map record the append-eod setting?"
+plan = "5.5 Check 3; 3.3 (position mode); F1"
+core = true
+given = { set = "100k", layout = "round-robin", map = "capture" }
+expect = { drops_with_reason_no_tokens = 0, append_eod_recorded = true, append_eod = true }
+expect_under = { F1 = { drops_with_reason_no_tokens = 0, append_eod_recorded = true, append_eod = true, map_built_by = "token-matching" } }
+source = "the plant list, counted by the counting script: every line of the release that is not in its list of sanitizer drops survives with a text that is not empty, and the set plants no surviving line without tokens (docs/plant.md, section 8), so the expected number is zero and every surviving line is a document; append-eod is on in every tokenizer run of the replica (the spec, tokenizer.append_eod)"
+
+[[row]]
+id = "c03.drops.no-tokens.planted-line"
+question = "Does a surviving input line that gives no tokens appear as a drop with the reason \"no tokens\", without shifting the ordinal of any later line?"
+plan = "5.5 Check 3 (a line that gives no tokens); 3.3 (position mode); 3.1 (Drop); F1"
+core = true
+given = { store = "scratch-notokens", artifact = "c03/shard-notokens", state = "t.no-tokens-line", maps = ["capture", "position recovery"] }
+expect = { input_lines = 5, documents = 4, drops = [ { line = 3, reason = "no tokens" } ], ordinal_of_line = { "1" = 0, "2" = 1, "4" = 2, "5" = 3 }, records = ["U-001", "U-002", "U-003", "U-004"], label = "recovered", verification = "passed", append_eod_recorded = true }
+expect_under = { F1 = { applies = false } }
+source = "hand-written table: a line that gives no tokens adds no document a reader can fetch (plan F1), so five input lines give four documents, and position mode counts the line as a drop and gives the next ordinal to the next line that has tokens (3.3). An ordinal is the number the dataset's reader is asked for, the sequence number of the shard's index. Shown once on Megatron's preprocessing at the pinned tag, outside the tool: such an input gave four sequences, and the index's document list kept a fifth, empty entry at the place of the line, which no reader fetches and which is no ordinal. The four texts are four different records of Z, so none is a twin and each document is recovered. Under F1's fallback there is no position mode and the row does not apply"
+
+[[row]]
+id = "c03.records.capture"
+question = "Is the record the wrapper-written map assigns to each ordinal the planted record whose tokenization equals the shard's tokens at that ordinal?"
+plan = "5.5 Check 3; 3.3 (Tokenization)"
+core = true
+given = { set = "100k", layout = "round-robin", map = "capture" }
+expect = { per_ordinal = "the planted record whose tokens equal the shard's tokens at that ordinal", mismatches = 0 }
+expect_under = { F1 = { per_ordinal = "the planted record whose tokens equal the shard's tokens at that ordinal", mismatches = 0, map_built_by = "token-matching" } }
+source = "the plant list and the replica's chunk files: the id each surviving chunk-file line carries, which the counting script accepts only when the line's text is that record's sanitized text in the plant list; the team's tokenizer applied to those texts; the shard's own tokens"
+
+[[row]]
+id = "c03.records.position-recovery"
+question = "Is the record the position-mode recovered map assigns to each ordinal the same planted record?"
+plan = "5.5 Check 3; 3.3 (position mode)"
+core = true
+given = { set = "100k", layout = "round-robin", map = "position recovery" }
+expect = { per_ordinal = "the planted record whose tokens equal the shard's tokens at that ordinal", mismatches = 0 }
+expect_under = { F1 = { applies = false } }
+source = "the plant list and the replica's chunk files: the id each surviving chunk-file line carries, checked by the counting script against the plant list; the ids are kept by the replica up to the tokenizer input and are not given to the tool"
+
+[[row]]
+id = "c03.pairs.same-shard"
+question = "For each planted identical pair placed in one shard, is each of its two ordinals labelled \"candidates\" with exactly the pair's two occurrences as the candidate set, in all three maps?"
+plan = "5.5 Check 3; 3.3 (identical twins); 3.2"
+core = true
+given = { set = "100k", layout = "round-robin", maps = ["capture", "position recovery", "token-matching recovery"] }
+expect = { label = "candidates", candidate_set = "exactly the two chunk-file lines of the pair", other_labels_for_these_ordinals = 0 }
+expect_under = { F1 = { label = "candidates", candidate_set = "exactly the two chunk-file lines of the pair", maps = ["capture built by token matching", "token-matching recovery"] } }
+source = "the plant list, counted by the counting script: the list of same-shard pairs, each with the two chunk-file lines whose ids resolve to its two members"
+
+[[row]]
+id = "c03.pairs.same-shard.swap"
+question = "Does swapping the pair's two lines in the input of the position-mode recovery leave both labels and candidate sets unchanged?"
+plan = "5.5 Check 3; 3.3 (only a swap within twins can escape verification)"
+core = true
+given = { set = "100k", layout = "round-robin", map = "position recovery", state = "t.twin-swap" }
+expect = { label = "candidates", candidate_set = "unchanged" }
+expect_under = { F1 = { applies = false } }
+source = "the plant list, counted by the counting script: the list of same-shard pairs with their two chunk-file lines"
+
+[[row]]
+id = "c03.pairs.split"
+question = "For each pair split across two shards, is each ordinal's record the occurrence in its own shard's chunk file, labelled \"recovered\"?"
+plan = "5.5 Check 3; 3.3 (twins in different shards are told apart by their shard)"
+core = true
+given = { set = "100k", layout = "round-robin", maps = ["capture", "position recovery", "token-matching recovery"] }
+expect = { label = "recovered", record = "the line of the pair's member in the same shard's chunk file" }
+source = "the plant list, counted by the counting script: the list of split pairs, each with its two chunk files and lines"
+
+[[row]]
+id = "c03.records.token-matching"
+question = "Does the token-matching recovered map assign the same records to every other document?"
+plan = "5.5 Check 3; 3.3 (token-matching mode)"
+core = true
+given = { set = "100k", layout = "round-robin", map = "token-matching recovery" }
+expect = { per_ordinal = "the same record as the capture map, for every document outside a same-shard pair", mismatches = 0 }
+source = "the plant list and the replica's chunk files: the id each surviving chunk-file line carries, checked by the counting script against the plant list"
+
+[[row]]
+id = "c03.verification-failed"
+question = "Is a shard whose verification fails labelled \"unknown\"?"
+plan = "5.5 Check 3; 3.3 (failed or not run gives unknown); 2.2(f)"
+core = true
+given = { set = "100k", layout = "round-robin", state = "t.verification-fails", maps = ["position recovery", "token-matching recovery"] }
+expect = { verification = "failed", label = "unknown", labels_of_documents = ["unknown"] }
+expect_under = { F1 = { verification = "failed", label = "unknown", labels_of_documents = ["unknown"], maps = ["token-matching recovery"] } }
+source = "hand-written table: the label follows from the mode and the result; failed gives \"unknown\" (3.3). With one input line replaced by a text no document holds, the document at that line's ordinal does not match a re-tokenization of its line, so position mode fails, and token matching finds no line for that document, so it fails too"
+
+[[row]]
+id = "c03.map-fields"
+question = "Does every map record carry its derivation mode, verification result and label?"
+plan = "5.5 Check 3; 3.3; 3.4"
+core = true
+given = { set = "100k", layout = "round-robin", maps = ["capture", "position recovery", "token-matching recovery"] }
+expect = { capture = { namespace = "capture", derivation = "position", verification = "passed" }, position_recovery = { namespace = "recovery", derivation = "position", verification = "passed" }, token_matching_recovery = { namespace = "recovery", derivation = "token-matching", verification = "passed" }, maps_per_shard = 3, labels_of_documents = ["recovered", "candidates"] }
+expect_under = { F1 = { capture = { namespace = "capture", derivation = "token-matching", verification = "passed" }, token_matching_recovery = { namespace = "recovery", derivation = "token-matching", verification = "passed" }, maps_per_shard = 2 } }
+source = "hand-written table: the wrapper uses position mode at tokenization time (3.3), each mode stores its own name, and a passed verification gives \"recovered\" or \"candidates\" per document. The three maps are stored side by side for one shard: the capture map in the capture namespace, the two recovery maps in the recovery namespace, one per derivation mode (DECISIONS.md D-20)"

@@ -1,0 +1,125 @@
+# Check 4, store integrity (plan 5.5 Check 4). Written by hand before the tool exists.
+# Conventions, the scratch-500 store and the fault catalogue: README.md.
+#
+# Every injected fault of the check is listed here with its expected outcome.
+# The loud faults (ids l.*) are edited into a copy of the store outside the write
+# API. Their one outcome is: the query exits with code 3, names the mismatch on
+# standard error and prints no answer, whatever the answer would have been.
+#
+# What each loud check compares (DECISIONS.md D-18): the map check compares a
+# binding with the store's own records (its declared count with its stored rows, its
+# declared digest with the artifact's registered digest); the artifact check
+# compares the registered digest with the file on disk. So a changed file raises
+# "artifact digest mismatch" and never a map fault, and an altered stored count
+# raises "map count mismatch". Since DECISIONS.md D-26 a binding's declared count
+# is also compared with the records of the file, when the file has its registered
+# digest; no row of this file rests on that comparison. The map-digest fault is
+# injected in Check 5 (f.digest).
+
+[[row]]
+id = "c04.kill-after-100"
+question = "Writing a 500-row map and killing the writer after 100 rows: what does the store hold for that shard after reopening?"
+plan = "5.5 Check 4; 3.4 (write_map is one transaction)"
+core = true
+given = { store = "scratch-500", artifact = "c04/shard-500", state = "w.kill-after-100" }
+expect = { one_of = ["no map for the shard", "the complete map: 500 rows"], never = ["a map with fewer than 500 rows", "rows without a binding"] }
+source = "hand-written table: the map is written in one transaction, so an interrupted write leaves either nothing or all of it (3.4)"
+
+[[row]]
+id = "c04.retry"
+question = "Retrying the interrupted write on the reopened store, declaring 500 rows and the shard's digest: what is the result?"
+plan = "5.5 Check 4 (the retry); 3.4"
+core = true
+given = { store = "scratch-500", artifact = "c04/shard-500", state = "w.retry" }
+expect = { one_of = ["a map that matches its shard: 500 rows, its count and digest bound to the shard", "a rejection with a named mismatch: declared count mismatch or declared digest mismatch"], never = ["a partial map", "a map whose count or digest does not match the shard"] }
+source = "hand-written table: the plan allows these two outcomes and forbids the other two"
+
+[[row]]
+id = "c04.declare-499.write"
+question = "On a fresh store, declaring 499 rows for the 500-document shard: does write_map refuse and leave no map?"
+plan = "5.5 Check 4; 3.4 (refuses unless the declared count and digest match the artifact on disk)"
+core = true
+given = { store = "scratch-500", artifact = "c04/shard-500", state = "w.declare-499" }
+expect = { error = "declared count mismatch", map_after = "no map for the shard", rows_after = 0 }
+source = "hand-written table: the shard on disk holds 500 documents and 499 were declared"
+
+[[row]]
+id = "c04.declare-499.query"
+question = "After that refusal, what does a query about the shard answer?"
+plan = "5.5 Check 4 (the query then answers \"not covered\"); 2.1; 2.3"
+core = true
+given = { store = "scratch-500", request = "withdraw A", artifact = "c04/shard-500", state = "w.declare-499" }
+expect = { answer = "not covered", reason = "record missing" }
+source = "hand-written table: the shard is registered and has no map, so its own record is missing (2.1); it is not \"not registered\", because the store was told of the shard"
+
+[[row]]
+id = "c04.count-499"
+question = "With the stored count of the complete 500-row map altered to 499, what happens to a query about the shard?"
+plan = "5.5 Check 4; 2.2(d); 3.4"
+core = true
+given = { store = "scratch-500", request = "withdraw A", artifact = "c04/shard-500", state = "l.count-499" }
+expect = { error = "map count mismatch", exit_code = 3, stdout_empty = true }
+source = "hand-written table: the binding now declares 499 rows while the map holds 500, so the map check stops the query (D-18); the shard's file is untouched, so no other loud check can be the one that fires. Unaltered, the shard would have answered \"does not contain\""
+
+[[row]]
+id = "c04.edge-parent.R1"
+question = "With the parent of P's stated edge pointing at no occurrence, what happens to a query about R1?"
+plan = "5.5 Check 4 (the other three loud checks); 2.2(c); 3.4"
+core = true
+given = { request = "withdraw A", artifact = "R1", state = "l.edge-parent" }
+expect = { error = "edge parent missing", exit_code = 3, stdout_empty = true }
+source = "hand-written table: R1 holds a copy of P, so the stated edge of P is in its ancestor closure and that edge's parent occurrence is absent; unaltered, R1 would have answered \"contains\""
+
+[[row]]
+id = "c04.edge-parent.gen/P"
+question = "With the parent of P's stated edge pointing at no occurrence, what happens to a query about gen/P?"
+plan = "5.5 Check 4; 2.2(c); 3.4"
+core = true
+given = { request = "withdraw A", artifact = "gen/P", state = "l.edge-parent" }
+expect = { error = "edge parent missing", exit_code = 3, stdout_empty = true }
+source = "hand-written table: the stated edge of P names a parent occurrence that is absent"
+
+[[row]]
+id = "c04.trace-count.E@6"
+question = "With the trace of step 5 one sample short of the batch size, what happens to a query about E@6?"
+plan = "5.5 Check 4 (the trace check); 2.2(e); 3.4"
+core = true
+given = { request = "withdraw A", artifact = "E@6", state = "l.trace-count" }
+expect = { error = "trace sample count mismatch", exit_code = 3, stdout_empty = true }
+source = "hand-written table: a present trace counts 3 samples for a step whose batch size is 4; this is a loud fault, not an untraced step. Unaltered, E@6 would have answered \"does not contain\""
+
+[[row]]
+id = "c04.trace-count.E@9"
+question = "With the trace of step 5 one sample short of the batch size, what happens to a query about E@9?"
+plan = "5.5 Check 4; 2.2 closing paragraph (whatever the answer would have been); 3.4"
+core = true
+given = { request = "withdraw A", artifact = "E@9", state = "l.trace-count" }
+expect = { error = "trace sample count mismatch", exit_code = 3, stdout_empty = true }
+source = "hand-written table: step 5 is in E@9's history; the loud stop comes before any answer, so the recorded \"contains\" is not printed"
+
+[[row]]
+id = "c04.artifact-digest.R2"
+question = "With one byte of R2's file changed on disk, what happens to a query about R2?"
+plan = "5.5 Check 4 (an artifact whose digest no longer matches its file); 3.4"
+core = true
+given = { request = "withdraw A", artifact = "R2", state = "l.artifact-digest" }
+expect = { error = "artifact digest mismatch", exit_code = 3, stdout_empty = true }
+source = "hand-written table: the file's digest no longer equals the digest the store registered for the artifact. The store is not edited, so the count and digest its occurrence binding declares still agree with its own records, and the artifact check is the only one that fires (D-18). Unaltered, R2 would have answered \"does not contain\""
+
+[[row]]
+id = "c04.not-a-stop.trace-deleted"
+question = "Is a deleted trace a loud stop?"
+plan = "5.5 Check 4 (a deleted or half-covered trace is the untraced fault of Check 5, not a stop); 3.4"
+core = true
+given = { request = "withdraw A", artifact = "E@6", state = "f.trace-deleted" }
+expect = { answer = "may contain", loud_stop = false }
+source = "hand-written table: a missing trace is an untraced step and gives an answer (row c05.f.trace-deleted.E@6)"
+
+[[row]]
+id = "c04.not-a-stop.trace-half"
+question = "Is a half-covered trace a loud stop?"
+plan = "5.5 Check 4 (a deleted or half-covered trace is the untraced fault of Check 5, not a stop); 3.4"
+core = true
+given = { request = "withdraw A", artifact = "E@6", state = "f.trace-half" }
+expect = { answer = "may contain", loud_stop = false }
+source = "hand-written table: a lowered coverage mark is an untraced step and gives an answer (row c05.f.trace-half.E@6)"

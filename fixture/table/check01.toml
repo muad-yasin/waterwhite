@@ -1,0 +1,199 @@
+# Check 1, the exposure join (plan 5.5 Check 1). Written by hand before the tool exists.
+# Conventions: README.md.
+#
+# The expected rows of this check are the oracle's log (docs/interfaces.md 8.3),
+# which exists only after the seed search. A row here says what is compared and
+# names the pending spec item that will hold the position and its log lines; it
+# holds a value only where the plan gives the hand-written table as the source
+# (step 8's cut, its untraced mark, checkpoint 9's answer).
+#
+# Under fallback F5 every "the oracle's log" below is the golden log committed from
+# the machine where the oracle ran, and the result is reported as judged against it.
+#
+# sample_pos is the place of a sample inside its step as the oracle counts it:
+# micro-batch round first, then rank, then place in the micro batch
+# (round * micro batch * ranks + rank * micro batch + place). In run E (one rank,
+# one micro batch of 4 per step) it runs 0 to 3 in the order of the global index.
+# In run K (two ranks, one micro batch of 2 each per step) rank 0 holds sample_pos
+# 0 and 1 and rank 1 holds 2 and 3.
+
+[[row]]
+id = "c01.E.diff"
+question = "On run E, does every (step, shard, ordinal, token start, token end) the join reports equal the oracle's log?"
+plan = "5.5 Check 1; 3.5; 5.3"
+core = true
+given = { run = "E", layout = "partitioned" }
+expect = { diff = "empty", compared = "every row of steps 1 to 12, except the rows of the last sample of step 8 past the cut (rows c01.E.step8.*)" }
+expect_under = { F5 = { diff = "empty", judged_against = "the golden log from another machine" } }
+source = "the oracle's log of run E (both segments); no row of it is written here"
+
+[[row]]
+id = "c01.E.T"
+question = "Does the join report T whole as the second row of one sample of step 7, tokens 0 to 22 of T's document, after the end of one unrelated document of shard 3 and before the start of another, and in no other row of run E?"
+plan = "5.5 Check 1; 5.1; DECISIONS.md D-24"
+core = true
+given = { run = "E", segment = "E/seg-2", step = 7, record = "T" }
+expect = { diff = "empty", rows = "pending:positions.T", row = { row_in_sample = 2, token_start = 0, token_end = 22 }, rows_in_sample = 3, rows_of_T_in_run_E = 1 }
+expect_under = { F5 = { diff = "empty", rows = "pending:positions.T", judged_against = "the golden log from another machine" } }
+source = "the oracle's log: the lines recorded under positions.T (search condition 4): the three rows of the sample that holds T. That T is 22 tokens long with its end-of-document token is the spec's sizes.tokens_of_T, counted by the tokenizer and equal to the document's length in the shard's index"
+
+[[row]]
+id = "c01.E.skipped-line"
+question = "Does the skipped sanitizer line leave every ordinal of shard 2 in place, so that the join's rows for a document after that line equal the oracle's?"
+plan = "5.5 Check 1 (including the skipped line); 5.1; F1"
+core = true
+given = { run = "E", artifact = "E/shard-2" }
+expect = { diff = "empty", rows = "pending:positions.skipped_line", documents_in_shard = 19, skipped_line = { input_line = 6, reason = "sanitizer skip" } }
+expect_under = { F5 = { diff = "empty", rows = "pending:positions.skipped_line", documents_in_shard = 19, skipped_line = { input_line = 6, reason = "sanitizer skip" }, judged_against = "the golden log from another machine" } }
+source = "the oracle's log: the lines recorded under positions.skipped_line (search conditions 2 and 3); the document count 19 is the spec's record list of shard-2, and the skipped line with its reason is the spec's sanitizer_skip, shown by the sanitizer's log (the replica's records): the input of shard-2 has 20 lines, line 6 is the unparseable one, and the documents after it keep ordinals 5 to 18"
+
+[[row]]
+id = "c01.E.repeated-draw"
+question = "Does the join report both reads of the document that is read in segment 1 and again in segment 2?"
+plan = "5.5 Check 1 (the repeated draw); 5.1"
+core = true
+given = { run = "E" }
+expect = { diff = "empty", rows = "pending:positions.repeated_draw" }
+expect_under = { F5 = { diff = "empty", rows = "pending:positions.repeated_draw", judged_against = "the golden log from another machine" } }
+source = "the oracle's log: the lines recorded under positions.repeated_draw (search condition 8)"
+
+[[row]]
+id = "c01.E.shared-ordinal"
+question = "Does the join keep apart the same ordinal read from two shards?"
+plan = "5.5 Check 1 (the shared ordinal); 5.1; 3.1 (Occurrence)"
+core = true
+given = { run = "E" }
+expect = { diff = "empty", rows = "pending:positions.shared_ordinal" }
+expect_under = { F5 = { diff = "empty", rows = "pending:positions.shared_ordinal", judged_against = "the golden log from another machine" } }
+source = "the oracle's log: the lines recorded under positions.shared_ordinal (search condition 9)"
+
+[[row]]
+id = "c01.E.split-document"
+question = "Does the join report both spans of the document that is split across two packed samples?"
+plan = "5.5 Check 1 (the split document); 5.1; Decision 18"
+core = true
+given = { run = "E" }
+expect = { diff = "empty", rows = "pending:positions.split_document" }
+expect_under = { F5 = { diff = "empty", rows = "pending:positions.split_document", judged_against = "the golden log from another machine" } }
+source = "the oracle's log: the lines recorded under positions.split_document (search condition 10)"
+
+[[row]]
+id = "c01.E.shared-token"
+question = "Does the join report the one token of W, a document of shard 3 and the last of a sample's 33 tokens, as a row of its own, the only row of steps 1 to 9 that names W?"
+plan = "5.5 Check 1 (the document read only through a shared token); 3.5; Decision 18; DECISIONS.md D-13 as amended by D-24"
+core = true
+given = { run = "E", segment = "E/seg-2", artifact = "E/shard-3", record = "W" }
+expect = { diff = "empty", rows = "pending:positions.shared_token", row = { token_start = 0, token_end = 1 }, sample_tokens = 33, rows_of_W_in_steps_1_to_9 = 1 }
+expect_under = { F5 = { diff = "empty", rows = "pending:positions.shared_token", judged_against = "the golden log from another machine" } }
+source = "the oracle's log: the lines recorded under positions.shared_token (search condition 12): the two rows of a sample of step 7, 8 or 9 that holds no row of T and is not the half-covered sample of step 8. W is an unrelated record of Z in shard 3; that the row covers tokens 0 to 1 and the sample spans sequence_length + 1 = 33 tokens is hand-written from plan 3.5"
+
+[[row]]
+id = "c01.E.step8.first-half"
+question = "For the last sample of step 8, do the join's rows up to the cut equal the oracle's rows of the first 16 tokens?"
+plan = "5.5 Check 1 (the half-covered sample at step 8); 3.5; 5.1"
+core = true
+given = { run = "E", segment = "E/seg-2", step = 8, sample_pos = 3 }
+expect = { diff = "empty", rows = "pending:positions.step8_cut", covered_tokens = 16, rule = "rows that end within the first 16 tokens are equal; the row that holds the 17th token ends at the cut; no later row is reported" }
+expect_under = { F5 = { diff = "empty", rows = "pending:positions.step8_cut", covered_tokens = 16, judged_against = "the golden log from another machine" } }
+source = "the oracle's log: the lines of that sample, cut by the rule of the spec's step record (runs.E.step_record)"
+
+[[row]]
+id = "c01.E.step8.uncovered"
+question = "Is the second half of that sample reported as an uncovered range that starts at the cut position?"
+plan = "5.5 Check 1; 3.5 (uncovered ranges are reported, never filled in); 5.1"
+core = true
+given = { run = "E", segment = "E/seg-2", step = 8, sample_pos = 3 }
+expect = { uncovered_in_sample = [16, 33], sample_tokens = 33, covered_tokens = 16, starts_at = "pending:positions.step8_cut" }
+source = "hand-written table: the cut rule of the spec, written before the tool exists (16 of 33 tokens read); where the cut falls in document terms is the pending item, read from the oracle's log"
+
+[[row]]
+id = "c01.E.step8.counted"
+question = "Is the half-covered sample still counted, so that step 8's trace counts 4 samples and no loud check stops?"
+plan = "5.1 (the sample is still counted); 3.4; 2.2(e)"
+core = true
+given = { run = "E", segment = "E/seg-2", step = 8 }
+expect = { consumed_samples = 4, loud_stop = false }
+source = "hand-written table: a lowered coverage mark is an untraced step, not a count fault (3.4)"
+
+[[row]]
+id = "c01.E.step8.untraced"
+question = "Is step 8 reported as untraced?"
+plan = "5.5 Check 1; 2.2(e); 3.5"
+core = true
+given = { request = "withdraw A", artifact = "E@9", state = "unmutated" }
+expect = { untraced_steps = [["E/seg-2", 8]] }
+source = "hand-written table: a step with an uncovered token range is untraced (2.2(e)); every other step of E@9's history is whole"
+
+[[row]]
+id = "c01.E.E@9"
+question = "Does checkpoint 9 keep \"contains\" while step 8 is untraced?"
+plan = "5.5 Check 1; Check 8; 2.4; Decision 20"
+core = true
+given = { request = "withdraw A", artifact = "E@9", state = "unmutated" }
+expect = { answer = "contains", first_exposure = { segment = "E/seg-2", step = 7 } }
+source = "hand-written table: T is consumed at step 7, which is fully traced; a recorded \"contains\" wins over the untraced step 8 (Decision 20)"
+
+[[row]]
+id = "c01.E-rr.diff"
+question = "Is the same diff empty on run E rebuilt in the round-robin layout?"
+plan = "5.5 Check 1; 5.2; 4.5"
+core = true
+given = { store = "rr", run = "E-rr", layout = "round-robin" }
+expect = { diff = "empty", compared = "every row of steps 1 to 12" }
+expect_under = { F5 = { diff = "empty", judged_against = "the golden log from another machine" } }
+source = "the oracle's log of run E in the round-robin layout"
+
+[[row]]
+id = "c01.E-rr.fully-traced"
+question = "Is every step of the round-robin run fully traced?"
+plan = "5.5 Check 1 (the same records, settings and seed, every step fully traced)"
+core = true
+given = { store = "rr", run = "E-rr", layout = "round-robin" }
+expect = { steps_with_uncovered_range = [], steps_without_trace = [] }
+source = "hand-written table: the round-robin run is registered with no step record that lowers a sample (spec, runs.E-rr; search condition 17). Its step records name one checkpoint, E-rr@6, which the second segment resumes from; no answer is tabulated for it (plan 4.5; DECISIONS.md D-24)"
+
+[[row]]
+id = "c01.K.diff"
+question = "Is the diff empty on run K, across its epoch boundary, its resume and its warm start?"
+plan = "5.5 Check 1; 5.1 (run K); 3.5; F5"
+core = true
+given = { run = "K" }
+expect = { diff = "empty", compared = "every row of steps 1 to 40, both ranks" }
+expect_under = { F5 = { diff = "empty", judged_against = "the golden log from another machine" } }
+source = "the oracle's log of run K, with one sampler per rank built at data-parallel size 2"
+
+[[row]]
+id = "c01.K.warm-start"
+question = "Does the join read run K's first launch from a consumed-sample counter of 0, although K starts from E@6, which was saved at 24?"
+plan = "5.5 Check 1 (its warm start); 3.5 (counted from the consumed-sample counter of its launch); F4"
+core = true
+given = { run = "K", segment = "K/seg-1", launch = 0 }
+expect = { consumed_at_start = 0, first_step = 1, last_step = 3, diff = "empty", rows = "pending:positions.K" }
+source = "hand-written table: a warm start restarts the counter (F4; spec, runs.K); the rows themselves are the oracle's log of steps 1 to 3"
+
+[[row]]
+id = "c01.K.resume"
+question = "Does the join continue run K's second launch inside epoch 0, from a counter of 12?"
+plan = "5.5 Check 1 (its resume); 3.5 (input 5: the consumed-sample counter at each start); F4"
+core = true
+given = { run = "K", segment = "K/seg-1", launch = 1 }
+expect = { consumed_at_start = 12, first_step = 4, last_step = 40, diff = "empty", rows = "pending:positions.K" }
+source = "hand-written table: launch 0 completed 3 steps of 4 samples (spec, runs.K); the rows themselves are the oracle's log from step 4 on"
+
+[[row]]
+id = "c01.K.epoch-boundary"
+question = "Does the join read the step after the epoch boundary in the order of epoch 1?"
+plan = "5.5 Check 1 (across its epoch boundary); 3.5 (input 6: the shuffle is seeded with the epoch number)"
+core = true
+given = { run = "K", segment = "K/seg-1" }
+expect = { diff = "empty", rows = "pending:positions.K", boundary_after_step = "pending:positions.K.epoch_steps" }
+source = "the oracle's log: the first row of the step after epoch_steps, recorded under positions.K (search conditions 19 and 20). The epoch length is N div 4 steps for a blend of N samples (spec, runs.K); the blend holds N = 57 samples as the oracle's dataset reports it (spec, positions.K.blend_length and sizes.dataset_length), so an epoch is 14 steps (positions.K.epoch_steps), the first boundary lies after step 14 and a second one after step 28; step 15 is the first step read in the order of epoch 1 (positions.K.step_after_the_boundary)"
+
+[[row]]
+id = "c01.K.ranks"
+question = "Does every step of run K hold two samples of rank 0 and two of rank 1?"
+plan = "5.5 Check 1 (one sampler per rank at run K's data-parallel size); 3.5 (input 3)"
+core = true
+given = { run = "K", segment = "K/seg-1" }
+expect = { samples_per_step = 4, samples_per_rank = 2, ranks = [0, 1], sample_pos_of_rank_0 = [0, 1], sample_pos_of_rank_1 = [2, 3] }
+source = "hand-written table: micro batch 2 on 2 ranks gives the global batch 4, one micro batch per rank per step (spec, runs.K); sample_pos counts the round, then the rank, then the place in the micro batch, so rank 0 holds 0 and 1 and rank 1 holds 2 and 3; the rows are the oracle's log (search condition 18)"

@@ -1,0 +1,143 @@
+# Check 8, checkpoints with the evidence of run E (plan 5.5 Check 8). Written by hand
+# before the tool exists. Conventions: README.md.
+#
+# The answers are hand-written from the fixture's structure and the search
+# conditions of the spec. A step number that only the oracle's log can give is
+# written "pending:<spec key>".
+
+# ---------------------------------------------------------------------------------
+# "withdraw A": run E, descendant D, branch Y
+# ---------------------------------------------------------------------------------
+
+[[row]]
+id = "c08.withdraw-A.E@6"
+question = "Under withdraw A, is checkpoint 6 \"does not contain\"?"
+plan = "5.5 Check 8; 2.4; 2.2(e)"
+core = true
+given = { request = "withdraw A", artifact = "E@6", state = "unmutated" }
+expect = { answer = "does not contain", notes = [], scope = { source = "A", members = ["A/r1"], steps = [["E/seg-1", 1, 6]] } }
+source = "hand-written table: its segment-1 history is completely traced and reads no affected record (search conditions 1 and 5); the negative is scoped to the source, the run and the steps covered (2.4)"
+
+[[row]]
+id = "c08.withdraw-A.E@9"
+question = "Under withdraw A, is checkpoint 9 \"contains\", stating its basis?"
+plan = "5.5 Check 8; 2.4; Decisions 18, 20 and 22"
+core = true
+given = { request = "withdraw A", artifact = "E@9", state = "unmutated" }
+expect = { answer = "contains", basis = "whole-sample read assumed (F9, L9)", first_exposure = { segment = "E/seg-2", step = 7 }, untraced_steps = [["E/seg-2", 8]], chain = ["E/seg-2:step 7", "E/shard-3:T", "gen/T:T", "gen/P:P", "src/A:X@A"], notes = ["the parent list is process evidence (what the harness handed the job and what the output states it used), not proof that the output depends on the source"] }
+source = "hand-written table: T is consumed at step 7, which is fully traced (search condition 4); the half-covered sample at step 8 does not change the answer and step 8 is listed as untraced beside the chain; the chain passes two generation edges (2.1)"
+
+[[row]]
+id = "c08.withdraw-A.E@9.step-8-holds-no-T"
+question = "Does the answer of checkpoint 9 rest on step 7 alone, and not on the half-covered sample of step 8?"
+plan = "5.5 Check 8 (the half-covered sample at step 8 changes neither answer); 5.1"
+core = true
+given = { request = "withdraw A", artifact = "E@9", state = "unmutated", segment = "E/seg-2", step = 8, sample_pos = 3 }
+expect = { rows_that_name_T = 0, first_exposure = { segment = "E/seg-2", step = 7 } }
+source = "the oracle's log: the lines of the last sample of step 8, recorded under positions.step8_cut, name no document that is T (search condition 6)"
+
+[[row]]
+id = "c08.withdraw-A.D@3"
+question = "Under withdraw A, is descendant D \"contains\", stating its basis?"
+plan = "5.5 Check 8; 2.4 (an ancestor answers \"contains\"; its basis passes down)"
+core = true
+given = { request = "withdraw A", artifact = "D@3", state = "unmutated" }
+expect = { answer = "contains", basis = "whole-sample read assumed (F9, L9)", first_exposure = { segment = "E/seg-2", step = 7 }, untraced_steps = [["E/seg-2", 8]] }
+source = "hand-written table: D starts from checkpoint 9; its own three steps read shards 1 and 2 only and are fully traced (search condition 13), so the exposure is inherited and the only untraced step of its history is step 8 of E/seg-2"
+
+[[row]]
+id = "c08.withdraw-A.Y@6"
+question = "Under withdraw A, is branch Y \"does not contain\"?"
+plan = "5.5 Check 8; 2.4 (none read an affected record, even if one was in its mixture)"
+core = true
+given = { request = "withdraw A", artifact = "Y@6", state = "unmutated" }
+expect = { answer = "does not contain", scope = { source = "A", members = ["A/r1"], steps = [["E/seg-1", 1, 6], ["Y/seg-1", 1, 6]] } }
+source = "hand-written table: Y's mixture holds T, but its six steps never read it (search condition 14); its history through checkpoint 6 is completely traced"
+
+[[row]]
+id = "c08.withdraw-A.Y/mix-1"
+question = "Does Y's mixture answer \"contains\" while Y's checkpoint answers \"does not contain\"?"
+plan = "5.5 Check 8 (its mixture holds T, but its steps never read it); 2.4 (eligible is not consumed)"
+core = true
+given = { request = "withdraw A", artifact = "Y/mix-1", state = "unmutated" }
+expect = { answer = "contains" }
+source = "hand-written table: the mixture's snapshot names shard 3, which holds T (5.1)"
+
+# ---------------------------------------------------------------------------------
+# "withdraw A": run K, the cyclic run
+# ---------------------------------------------------------------------------------
+
+[[row]]
+id = "c08.K.digests-match"
+question = "Does the shuffle the join computes for run K match the digests in run K's run record, for every launch, epoch and rank?"
+plan = "5.5 Check 8; 3.5 (the order of a cyclic run); 2.4"
+core = true
+given = { run = "K", segment = "K/seg-1", state = "unmutated" }
+expect = { shuffle_digests = "equal, for every (launch, epoch, rank) of the run record", digest_covers = "the whole order of one rank for one epoch, whatever part of the epoch the launch read", epoch_0_digests_of_launch_0_and_launch_1 = "equal, rank by rank" }
+expect_under = { cyclic-wrapper-route = { shuffle_digests = "none recorded" } }
+source = "the replica's records: run K's run record, written at training time in the run's own environment (3.5); the tool compares its own shuffle with it. A shuffle digest covers a whole epoch's order for one rank (DECISIONS.md D-16), so the resume inside epoch 0 changes no value: launch 0 and launch 1 record the same digest for epoch 0 of each rank"
+
+[[row]]
+id = "c08.withdraw-A.K@3"
+question = "Under withdraw A, what does checkpoint 3 of run K answer?"
+plan = "5.5 Check 8 (run K's checkpoints answer as the table lists them); 2.4; 3.5; F4"
+core = true
+given = { request = "withdraw A", artifact = "K@3", state = "unmutated" }
+expect = { answer = "does not contain", scope = { source = "A", members = ["A/r1"], steps = [["E/seg-1", 1, 6], ["K/seg-1", 1, 3]] } }
+expect_under = { cyclic-wrapper-route = { answer = "may contain", names = "cyclic order not recorded" } }
+source = "hand-written table: K starts from checkpoint 6, which answers \"does not contain\"; its steps 1 to 3, read from a counter of 0, hold no token of T on either rank (search conditions 18 and 22), and its shuffle matches the recorded digests"
+
+[[row]]
+id = "c08.withdraw-A.K@8"
+question = "Under withdraw A, what does checkpoint 8 of run K answer?"
+plan = "5.5 Check 8; 2.4; 3.5; Decision 18"
+core = true
+given = { request = "withdraw A", artifact = "K@8", state = "unmutated" }
+expect = { answer = "contains", basis = "whole-sample read assumed (F9, L9)", first_exposure = { segment = "K/seg-1", step = "pending:positions.K.first_read_of_T.step" }, untraced_steps = [] }
+expect_under = { cyclic-wrapper-route = { answer = "may contain", names = "cyclic order not recorded" } }
+source = "hand-written table: after the resume, a rank-1 sample of step 7 or 8 holds a token of T (search conditions 22 and 23); the step number is the oracle's log. No step of K's history is untraced: step 8 of E/seg-2 is not in it"
+
+[[row]]
+id = "c08.withdraw-A.K@40"
+question = "Under withdraw A, what does checkpoint 40 of run K, after the epoch boundary, answer?"
+plan = "5.5 Check 8; 2.4; 3.5"
+core = true
+given = { request = "withdraw A", artifact = "K@40", state = "unmutated" }
+expect = { answer = "contains", basis = "whole-sample read assumed (F9, L9)", first_exposure = { segment = "K/seg-1", step = "pending:positions.K.first_read_of_T.step" }, untraced_steps = [] }
+expect_under = { cyclic-wrapper-route = { answer = "may contain", names = "cyclic order not recorded" } }
+source = "hand-written table: its history holds the step that read T; the first exposure is the first such step, whatever later epochs read again"
+
+# ---------------------------------------------------------------------------------
+# The document read only through a shared token (DECISIONS.md D-13 as amended by
+# D-24). Request "withdraw W": source Z narrowed to the one record W. W is an
+# unrelated record of Z in shard 3, so no answer under "withdraw A" moves. Shard 3
+# enters run E with segment 2, so W is first read after checkpoint 6: through one
+# token, at a step from 7 to 9, before checkpoint 9.
+# ---------------------------------------------------------------------------------
+
+[[row]]
+id = "c08.shared-token.E@6"
+question = "For the record W alone, what does checkpoint 6, which lies before the step that read W's one token, answer?"
+plan = "5.5 Check 8; 2.4; 2.3 (a list of records); DECISIONS.md D-13 as amended by D-24"
+core = true
+given = { request = "withdraw W", artifact = "E@6", state = "unmutated", record = "pending:positions.shared_token.record" }
+expect = { answer = "does not contain", notes = [] }
+source = "hand-written table: W is a document of shard 3, and segment 1 trains on shards 1 and 2 only, so no row of steps 1 to 6 names W (search conditions 5 and 12); the segment is completely traced; W is a record of Z with no generation edge in its ancestry"
+
+[[row]]
+id = "c08.shared-token.E@9"
+question = "For the record W alone, what does checkpoint 9, which lies after the step that read W's one token, answer?"
+plan = "5.5 Check 8; 2.4 (a record counts as consumed when any of its tokens is read); 3.5; Decision 18; DECISIONS.md D-13 as amended by D-24"
+core = true
+given = { request = "withdraw W", artifact = "E@9", state = "unmutated", record = "pending:positions.shared_token.record" }
+expect = { answer = "contains", basis = "whole-sample read assumed (F9, L9)", first_exposure = { segment = "E/seg-2", step = "pending:positions.shared_token.step" }, notes = [] }
+source = "hand-written table: the only row of steps 1 to 9 that names W, and so its first read, is its token 0, the last of a sample's 33 tokens, inside the covered part of a sample of step 7, 8 or 9 (search condition 12); one token read is consumption (Decision 18). The step number is the oracle's log"
+
+[[row]]
+id = "c08.shared-token.D@3"
+question = "For the record W alone, what does descendant D answer?"
+plan = "5.5 Check 8; 2.4 (an ancestor answers \"contains\"); DECISIONS.md D-13 as amended by D-24"
+core = true
+given = { request = "withdraw W", artifact = "D@3", state = "unmutated", record = "pending:positions.shared_token.record" }
+expect = { answer = "contains", basis = "whole-sample read assumed (F9, L9)" }
+source = "hand-written table: D starts from checkpoint 9, which answers \"contains\"; D's own three steps read shards 1 and 2 only (search condition 13), so they read no token of W, a document of shard 3"

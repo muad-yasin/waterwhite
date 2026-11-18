@@ -1,0 +1,270 @@
+# Check 7, requests (plan 5.5 Check 7). Written by hand before the tool exists.
+# Conventions, stores and handles: README.md.
+#
+# "X" is the row of a release that holds the passage X. "The successor of R1" is
+# the release the replica builds from the rebuild report of "withdraw A" (plan 4.4).
+# Rows with core = false are extension rows: they are put only when their extension
+# is switched on, and are no failure while it is off (plan 5.5).
+
+# ---------------------------------------------------------------------------------
+# "withdraw A" on the main store
+# ---------------------------------------------------------------------------------
+
+[[row]]
+id = "c07.withdraw-A.R1"
+question = "Under withdraw A, what does R1 answer?"
+plan = "5.5 Check 7; 2.1"
+core = true
+given = { request = "withdraw A", artifact = "R1", state = "unmutated" }
+expect = { answer = "contains", notes = ["the parent list is process evidence (what the harness handed the job and what the output states it used), not proof that the output depends on the source"] }
+source = "hand-written table: R1 holds X with A's copy selected, and P, T and S, which derive from A through generation edges (5.1)"
+
+[[row]]
+id = "c07.report.R1.X"
+question = "Under withdraw A, what action does the report give the row X of R1, and where does the successor take X from?"
+plan = "5.5 Check 7; 4.1 (re-source); 2.3; Decision 15"
+core = true
+given = { request = "withdraw A", artifact = "R1", record = "X" }
+expect = { action = "re-source", new_parent = "src/B:X@B", withdrawn_parent = "src/A:X@A" }
+source = "hand-written table: X is an \"any\" row whose chosen parent X@A is withdrawn while the equivalent parent X@B remains, so the row keeps its place and takes B's copy (4.1)"
+
+[[row]]
+id = "c07.report.R1.X@B"
+question = "Under withdraw A, what action does the report give B's copy of X, the dedup loser of R1?"
+plan = "5.5 Check 7; 4.1 (promote); 3.1 (Drop); Decision 15"
+core = true
+given = { request = "withdraw A", artifact = "R1", record = "X@B" }
+expect = { action = "promote" }
+source = "hand-written table: the dedup loser whose winner is withdrawn returns to the release; re-source and promote are the two rows of one event (4.1)"
+
+[[row]]
+id = "c07.report.R1.P"
+question = "Under withdraw A, what action does the report give P?"
+plan = "5.5 Check 7; 4.1 (retire); Decision 10"
+core = true
+given = { request = "withdraw A", artifact = "R1", record = "P" }
+expect = { action = "retire", regenerate_with = "paraphrase" }
+source = "hand-written table: P's only parent X@A is in scope, so the descendant is retired; the report names its generation step so the team can rerun it (4.1)"
+
+[[row]]
+id = "c07.report.R1.T"
+question = "Under withdraw A, what action does the report give T?"
+plan = "5.5 Check 7; 4.1 (retire); Decision 10"
+core = true
+given = { request = "withdraw A", artifact = "R1", record = "T" }
+expect = { action = "retire", regenerate_with = "translation" }
+source = "hand-written table: T's only parent P is in scope through X@A"
+
+[[row]]
+id = "c07.report.R1.S"
+question = "Under withdraw A, what action does the report give S?"
+plan = "5.5 Check 7; 4.1 (retire: any parent of an \"all\" edge in scope); Decision 10"
+core = true
+given = { request = "withdraw A", artifact = "R1", record = "S" }
+expect = { action = "retire", regenerate_with = "summary" }
+source = "hand-written table: S is a summary of SA and SC with parent mode all; A withdrawn alone retires it (4.1)"
+
+[[row]]
+id = "c07.report.R1.U"
+question = "Under withdraw A, what action does the report give the 20 unrelated rows of R1?"
+plan = "5.5 Check 7; 4.1 (keep)"
+core = true
+given = { request = "withdraw A", artifact = "R1", records = "U-001..U-020" }
+expect = { action = "keep", count = 20 }
+source = "hand-written table: no ancestor of a record of Z is in scope"
+
+[[row]]
+id = "c07.successor.R1.X"
+question = "In the successor of R1, where does the row X come from?"
+plan = "5.5 Check 7 (the successor takes X from B); 4.1; 4.4"
+core = true
+given = { request = "withdraw A", artifact = "successor of R1", record = "X" }
+expect = { parent = "src/B:X@B", label = "observed", rows_in_successor = 21, absent = ["P", "T", "S"] }
+source = "hand-written table: the successor holds X from B's copy and the 20 unrelated rows; the three retired rows are gone and nothing refills them (4.2)"
+
+[[row]]
+id = "c07.history.R1.X"
+question = "After the successor is built, does the history of R1 still attribute X to A?"
+plan = "5.5 Check 7 (R1's history still attributing X to A); 2.3; 4.1; 4.4"
+core = true
+given = { request = "withdraw A", artifact = "R1", record = "X", state = "r.successor-registered" }
+expect = { selected_parent = "src/A:X@A", answer = "contains", instance_id = "unchanged" }
+source = "hand-written table: the history keeps its original attribution; the historical release still answers \"contains\" and is the same instance (2.3, 4.4)"
+
+[[row]]
+id = "c07.withdraw-A.R2"
+question = "Under withdraw A, is R2 left untouched?"
+plan = "5.5 Check 7; 2.2; 4.1 (keep); L12"
+core = true
+given = { request = "withdraw A", artifact = "R2", state = "unmutated" }
+expect = { answer = "does not contain", action = "keep", notes = [] }
+source = "hand-written table: R2 is built from B and Z only; its copy of X is B's own and lies outside a withdrawal of A (L12)"
+
+# ---------------------------------------------------------------------------------
+# The swapped-winner build (store "swap": R1-swap beside R1)
+# ---------------------------------------------------------------------------------
+
+[[row]]
+id = "c07.swap.X-attribution"
+question = "In R1-swap, which copy is X attributed to?"
+plan = "5.5 Check 7 (X attributed to B in R1); 3.1 (Edge, parent mode any)"
+core = true
+given = { store = "swap", artifact = "R1-swap", record = "X" }
+expect = { selected_parent = "src/B:X@B", parent_mode = "any", loser = "src/A:X@A" }
+source = "hand-written table: the spec builds R1-swap with dedup winner B"
+
+[[row]]
+id = "c07.swap.withdraw-A.R1-swap"
+question = "Under withdraw A, what does R1-swap answer?"
+plan = "5.5 Check 7; 2.1"
+core = true
+given = { store = "swap", request = "withdraw A", artifact = "R1-swap", state = "unmutated" }
+expect = { answer = "contains", notes = ["the parent list is process evidence (what the harness handed the job and what the output states it used), not proof that the output depends on the source"] }
+source = "hand-written table: P, T and S are in R1-swap and derive from A whichever copy dedup kept; each of those chains passes a generation edge"
+
+[[row]]
+id = "c07.swap.report.X"
+question = "Under withdraw A, what action does the report give the row X of R1-swap?"
+plan = "5.5 Check 7 (under \"withdraw A\", X stays); 2.3 (an \"any\" record keeps its place while an equivalent parent remains); 4.1"
+core = true
+given = { store = "swap", request = "withdraw A", artifact = "R1-swap", record = "X" }
+expect = { action = "keep" }
+source = "hand-written table: the chosen parent is B's copy, which is not withdrawn, so nothing is re-sourced and nothing is promoted"
+
+[[row]]
+id = "c07.swap.report.P-T-S"
+question = "Under withdraw A, what action does the report give P, T and S of R1-swap?"
+plan = "5.5 Check 7 (P, T and S still go); 4.1 (retire)"
+core = true
+given = { store = "swap", request = "withdraw A", artifact = "R1-swap", records = ["P", "T", "S"] }
+expect = { action = "retire", count = 3 }
+source = "hand-written table: P is made from A's copy of X before dedup (5.1), so the swap does not change the derivation of P, T or S"
+
+[[row]]
+id = "c07.swap.report.counts"
+question = "Under withdraw A, what are the action counts of R1-swap?"
+plan = "5.5 Check 7; 4.1"
+core = true
+given = { store = "swap", request = "withdraw A", artifact = "R1-swap" }
+expect = { counts = { keep = 21, re-source = 0, promote = 0, retire = 3, unresolved = 0 } }
+source = "hand-written table: X and the 20 unrelated rows are kept; the loser of the dedup group is A's copy, which is withdrawn and returns nowhere"
+
+[[row]]
+id = "c07.swap.two-instances"
+question = "Are R1 and R1-swap, identical in bytes, two artifact instances whose occurrences of X carry different keys?"
+plan = "5.5 Check 7; 3.1 (Artifact instance); Decision 29; DECISIONS.md D-06"
+core = true
+given = { store = "swap", artifacts = ["R1", "R1-swap"], record = "X" }
+expect = { content_digests = "equal", instance_ids = "different", occurrence_keys_of_X = "different" }
+source = "hand-written table: release rows carry no source id (spec, release_rows), so the bytes are equal; the selected parent of the \"any\" edge differs, so the edge digests and the instance ids differ, and an occurrence key is the instance id plus a locator"
+
+[[row]]
+id = "c07.swap.instance-id-changes"
+question = "Does swapping which equivalent parent dedup kept, every other input unchanged, change the instance id?"
+plan = "5.5 Check 7; 3.1 (the selected parent is part of the edge digest); Decision 29"
+core = true
+given = { store = "swap", artifacts = ["R1", "R1-swap"] }
+expect = { instance_id = "changes", producing_step = "equal", input_instance_ids = "equal", edge_digest = "changes" }
+source = "hand-written table: the producing step and its inputs are the same; only the selected parent in the edge record of X differs (3.1)"
+
+[[row]]
+id = "c07.reregister.same-id"
+question = "Does registering the same history again keep the instance id?"
+plan = "5.5 Check 7; 3.1 (one artifact registered twice with the same history is one instance); Decision 29"
+core = true
+given = { artifact = "R1", action = "register R1 again with the same file, step, inputs and edges" }
+expect = { instance_id = "unchanged", new_artifacts = 0, new_occurrences = 0 }
+source = "hand-written table: the instance id is a function of the content and the history alone"
+
+# ---------------------------------------------------------------------------------
+# Extension rows and their off state
+# ---------------------------------------------------------------------------------
+
+[[row]]
+id = "c07.ban.off"
+question = "While the content-ban extension is off, what happens to the request \"ban X\"?"
+plan = "1.4 (while it is off); 2.3; L7"
+core = true
+given = { request = "ban X", artifact = "(listing)", state = "unmutated" }
+expect = { error = "extension off", exit_code = 2, stdout_empty = true }
+source = "hand-written table: a request of an extension that is off is refused with a named error before any answer. This row is the off state of the ban rows below"
+
+[[row]]
+id = "c07.ban.R1"
+question = "With the content ban on, does \"ban X\" flag R1?"
+plan = "5.5 Check 7 (extension row); 2.3 (ban a content across origins); L2"
+core = false
+extension = "content-ban"
+given = { request = "ban X", artifact = "R1", extensions_on = ["content-ban"] }
+expect = { answer = "contains" }
+source = "hand-written table: R1 holds a row whose text equals X after normalisation, and P and T, which are recorded as derived from a match"
+
+[[row]]
+id = "c07.ban.R2"
+question = "With the content ban on, does \"ban X\" flag R2?"
+plan = "5.5 Check 7 (extension row); 2.3; L2"
+core = false
+extension = "content-ban"
+given = { request = "ban X", artifact = "R2", extensions_on = ["content-ban"] }
+expect = { answer = "contains" }
+source = "hand-written table: R2 holds B's copy of X, which a ban matches whatever its origin"
+
+[[row]]
+id = "c07.ban.scope"
+question = "With the content ban on, which records does \"ban X\" put in scope, and which does it keep?"
+plan = "5.5 Check 7 (extension row); 2.3; L2"
+core = false
+extension = "content-ban"
+given = { request = "ban X", extensions_on = ["content-ban"] }
+expect = { in_scope = ["X@A", "X@B", "P", "T"], kept = ["S", "SA", "SC", "every record of Z", "B-002..B-013", "the other documents of the packed sample that holds T at step 7 of run E"], neighbours_of_T = "pending:positions.T" }
+source = "hand-written table: both copies of X match by fingerprint, and P and T are recorded as derived from a match; S is made from SA and SC and is unrelated. The neighbours of T in its packed sample are the oracle's log lines under positions.T"
+
+[[row]]
+id = "c07.R3.G6"
+question = "With the generating-model rule on, what does the record G6 of R3 answer under withdraw A?"
+plan = "5.5 Check 7 (extension row); 2.2(h); 5.1 (release R3); Decision 28"
+core = false
+extension = "generating-model"
+given = { request = "withdraw A", artifact = "R3", record = "G6", extensions_on = ["generating-model"] }
+expect = { answer = "does not contain" }
+source = "hand-written table: G6 is made from an unrelated record of Z by a stand-in model that is checkpoint 6, which answers \"does not contain\" for A (c08.withdraw-A.E@6)"
+
+[[row]]
+id = "c07.R3.G9"
+question = "With the generating-model rule on, what does the record G9 of R3 answer under withdraw A?"
+plan = "5.5 Check 7 (extension row); 2.2(h); 3.3; Decision 28"
+core = false
+extension = "generating-model"
+given = { request = "withdraw A", artifact = "R3", record = "G9", extensions_on = ["generating-model"] }
+expect = { answer = "may contain", names = "generating model exposed", failing = { condition = "h", artifact = "E@9" } }
+source = "hand-written table: its generating model is checkpoint 9, which answers \"contains\"; the output answers \"may contain\" naming it and never \"contains\" on that basis (2.2(h))"
+
+[[row]]
+id = "c07.R3.GU"
+question = "With the generating-model rule on, what does the record GU of R3 answer under withdraw A?"
+plan = "5.5 Check 7 (extension row); 2.2(h); 3.3; L11"
+core = false
+extension = "generating-model"
+given = { request = "withdraw A", artifact = "R3", record = "GU", extensions_on = ["generating-model"] }
+expect = { answer = "may contain", names = "generating model not registered", failing = { condition = "h", artifact = "hosted-model-x" } }
+source = "hand-written table: its generating model was never registered, so it is \"not covered\" and its output answers \"may contain\" naming it (3.3); the model is the spelling the fixture declares in [extension_releases.R3], never_registered, and failing.artifact names it (2.2(h); plan line 302)"
+
+[[row]]
+id = "c07.R3.GM"
+question = "With the generating-model rule on, what does the record GM of R3 answer under withdraw A?"
+plan = "5.5 Check 7 (extension row); 2.2(h); 3.3; L11"
+core = false
+extension = "generating-model"
+given = { request = "withdraw A", artifact = "R3", record = "GM", extensions_on = ["generating-model"] }
+expect = { answer = "may contain", names = "generating-model entry missing", failing = { condition = "h", job = "model-entry-removed" } }
+source = "hand-written table: its harness log has no model entry, which is read as not established; the answer names the job and the missing model entry (2.2(h)); the job is the one the fixture declares for the GM row of fixture/sources/generation_r3.jsonl (plan line 302)"
+
+[[row]]
+id = "c07.R3.release"
+question = "With the generating-model rule on, what does R3 answer as a whole, and which records does the report list as unresolved?"
+plan = "5.5 Check 7 (extension row); 4.1; 2.2(h)"
+core = false
+extension = "generating-model"
+given = { request = "withdraw A", artifact = "R3", extensions_on = ["generating-model"] }
+expect = { answer = "may contain", unresolved = ["G9", "GU", "GM"], not_unresolved = ["G6"] }
+source = "hand-written table: no record of R3 shows \"contains\" and three of its four records answer \"may contain\"; a \"may contain\" record has no action and is listed as unresolved (4.1)"

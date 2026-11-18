@@ -1,0 +1,253 @@
+# Check 9, repair (plan 5.5 Check 9). Written by hand before the tool exists.
+# Conventions: README.md.
+#
+# The record and action questions run on the 10k generated set in both layouts.
+# Their expected values come from the reference built from clean sources and from
+# the plant list, counted by the counting script; those rows name the source and,
+# in words, the script's output. The fixture's action counts and the questions on
+# run E are written here by hand; the exact-rerun restart is read from the oracle's
+# logs.
+#
+# Words. The actions of a record are keep, re-source, promote and retire; the
+# actions of an artifact are keep and rewrite (plan 4.1). There is no action
+# "remove": a release row that copies the withdrawn source's own record and has no
+# equivalent copy to take its place is retired (DECISIONS.md D-19). "Records
+# removed" is a count, the number of rows that leave the successor.
+
+# ---------------------------------------------------------------------------------
+# The 10k set, "withdraw A", both layouts
+# ---------------------------------------------------------------------------------
+
+[[row]]
+id = "c09.10k.multiset"
+question = "Does the retained (fingerprint, multiplicity) multiset of the repaired side equal the reference built from sources that never held A?"
+plan = "5.5 Check 9; 4.2; 4.4; Decision 6"
+core = true
+given = { set = "10k", layouts = ["partitioned", "round-robin"], request = "withdraw A" }
+expect = { multisets = "equal", unresolved_records = 0 }
+source = "a from-scratch reference: the reference side, built by the replica from the sources the generator writes without the withdrawn content (4.4)"
+
+[[row]]
+id = "c09.10k.shard-digests"
+question = "In seeded mode, do the per-shard byte digests of the repaired side match the reference?"
+plan = "5.5 Check 9; 4.2 (bytes match only where every step is seeded)"
+core = true
+given = { set = "10k", layouts = ["partitioned", "round-robin"], request = "withdraw A", mode = "seeded" }
+expect = { per_shard_digests = "equal" }
+source = "a from-scratch reference: the shards of the reference side, built in seeded mode"
+
+[[row]]
+id = "c09.10k.action-counts"
+question = "Are the report's action counts equal to the expected counts?"
+plan = "5.5 Check 9; 5.1 (where each set's expected answers come from); 4.1"
+core = true
+given = { set = "10k", layouts = ["partitioned", "round-robin"], request = "withdraw A" }
+expect = { counts = "equal to the script's counts for keep, rewrite, re-source, promote and retire, and for records removed", record_actions_allowed = ["keep", "re-source", "promote", "retire"] }
+source = "the plant list, counted by the counting script: the number of release rows per action (rows that take an equivalent copy from B, dedup losers of B that return, rows that leave because they are A's or derived from A, rows with no ancestor in A), the number of records removed, which is the number of rows that leave the successor, and from the chunk files the number of shards kept and rewritten"
+
+[[row]]
+id = "c09.10k.actions-by-kind"
+question = "Is every planted X release row \"re-source\", every B copy of a planted X \"promote\", and every planted P, T and S \"retire\"?"
+plan = "5.5 Check 9; 4.1; Decisions 10 and 15"
+core = true
+given = { set = "10k", layouts = ["partitioned", "round-robin"], request = "withdraw A" }
+expect = { X_release_rows = "re-source", B_copies_of_X = "promote", P_T_S = "retire" }
+source = "the plant list, counted by the counting script: the list of planted records by kind (X in A, X in B, P, T, S), each with its release row"
+
+[[row]]
+id = "c09.10k.partitioned.kept-shards"
+question = "In the partitioned layout, are exactly the shards of the kept-shard list \"keep\" and byte-identical afterwards?"
+plan = "5.5 Check 9; 5.1 (the kept-shard list); 4.1; 4.4"
+core = true
+given = { set = "10k", layout = "partitioned", request = "withdraw A" }
+expect = { keep = "exactly the shards of the kept-shard list", kept_shards_byte_identical = true, every_other_shard = "rewrite" }
+source = "the plant list, counted by the counting script: the kept-shard list, derived from the plant list and the chunk-file ids after chunking (a shard is kept when none of its lines is A's or derived from A and it receives no promoted or re-sourced record)"
+
+[[row]]
+id = "c09.10k.round-robin.all-rewrite"
+question = "In the round-robin layout, are all 20 chunks \"rewrite\"?"
+plan = "5.5 Check 9; 5.2 (the plant list guarantees that A's records reach every one of the 20 chunks); 4.5"
+core = true
+given = { set = "10k", layout = "round-robin", request = "withdraw A" }
+expect = { rewrite = 20, keep = 0 }
+source = "the plant list, counted by the counting script: per chunk, the number of lines that are A's or derived from A, which is at least one for each of the 20 chunks"
+
+[[row]]
+id = "c09.10k.successor-shards"
+question = "Do the successor shards answer as plan 4.4 says?"
+plan = "5.5 Check 9; 4.4"
+core = true
+given = { set = "10k", layouts = ["partitioned", "round-robin"], request = "withdraw A", artifact = "each successor shard" }
+expect = { answer = "does not contain" }
+source = "hand-written table: a successor built with capture on, whose map is whole and which holds no unresolved record, passes the proof (2.2, 4.4); the shards asked are every shard not on the kept-shard list, and which of them keeps a row in the repair is read from the plant list through the count's per-shard table, never from the report: a shard that keeps a row has a successor that answers as the row says, a shard that keeps none has no registered successor and no shard file of its name in the repaired build; a shard can also appear in the repair that the historical build did not hold (in the partitioned layout a source whose rows all lost the dedup has no shard there, and the promoted copies create one): the successor of each such shard that the reference build holds answers as the row says; whether the reference build holds it is read from its own shard files, and not from the list of the repaired build, the report or the verification; a shard of that kind that only the repaired build holds is a difference"
+
+[[row]]
+id = "c09.10k.R1-history"
+question = "Does the historical R1 of the 10k set still answer \"contains\" for A?"
+plan = "5.5 Check 9; 4.4 (history keeps its attribution)"
+core = true
+given = { set = "10k", layouts = ["partitioned", "round-robin"], request = "withdraw A", artifact = "R1" }
+expect = { answer = "contains" }
+source = "hand-written table: the re-query that must find nothing is scoped to successor artifacts; the historical release keeps its answer (4.4)"
+
+[[row]]
+id = "c09.10k.wrong-report"
+question = "Does a deliberately wrong report, with one descendant of A kept, make the two sides differ?"
+plan = "5.5 Check 9; 4.4 (the sides share the pipeline steps but not the report)"
+core = true
+given = { set = "10k", layouts = ["partitioned", "round-robin"], request = "withdraw A", state = "r.descendant-kept" }
+expect = { multisets = "differ", differing_records = 1 }
+source = "a from-scratch reference: the reference holds no descendant of A, so the kept one is in the repaired side only"
+
+[[row]]
+id = "c09.10k.wrong-report.unrelated-paraphrase-retired"
+question = "Does a second deliberately wrong report, which retires one paraphrase of an unrelated record of Z, make the two sides differ?"
+plan = "5.5 Check 9; 5.1 (Sizes: the paraphrases of unrelated records); 4.4 (the generator decides what the clean sources are; a report that drops an unaffected record makes the sides differ); DECISIONS.md D-23"
+core = true
+given = { set = "10k", layouts = ["partitioned", "round-robin"], request = "withdraw A", state = "r.unrelated-paraphrase-retired" }
+expect = { multisets = "differ", differing_records = 1 }
+source = "a from-scratch reference: the clean sources hold every paraphrase of an unrelated record, so the retired one is in the reference side only. Which record is retired is the first id of the counting script's list of the generated records that stay; the plant list marks each record of that list as out of scope, with the outcome keep in R1"
+
+# ---------------------------------------------------------------------------------
+# The fixture: action counts under "withdraw A"
+# ---------------------------------------------------------------------------------
+
+[[row]]
+id = "c09.fixture.R1.counts"
+question = "On the fixture, what are the report's action counts for the rows of R1?"
+plan = "5.5 Check 9 (the hand-written table for the fixture); 4.1; 5.1"
+core = true
+given = { request = "withdraw A", artifact = "R1" }
+expect = { counts = { keep = 20, re-source = 1, promote = 1, retire = 3, unresolved = 0 }, records_removed = 3, rows_in_successor = 21 }
+source = "hand-written table: X is re-sourced and B's copy promoted (one event, two rows); P, T and S are retired; the 20 unrelated rows are kept; every edge is observed, so nothing is unresolved"
+
+[[row]]
+id = "c09.fixture.R1.action"
+question = "On the fixture, what action does R1 get as an artifact?"
+plan = "5.5 Check 9; 4.1 (rewrite)"
+core = true
+given = { request = "withdraw A", artifact = "R1" }
+expect = { action = "rewrite" }
+source = "hand-written table: R1 holds affected rows, so it is rebuilt without them"
+
+[[row]]
+id = "c09.fixture.R2.action"
+question = "On the fixture, what action does R2 get?"
+plan = "5.5 Check 9; 4.1 (keep); 4.4 (kept artifacts are byte-identical afterwards)"
+core = true
+given = { request = "withdraw A", artifact = "R2" }
+expect = { action = "keep", byte_identical_afterwards = true }
+source = "hand-written table: no ancestor of any row of R2 is in scope"
+
+[[row]]
+id = "c09.fixture.E/shard-1.action"
+question = "On the fixture, what action does shard 1 get?"
+plan = "5.5 Check 9; 4.1 (keep); 4.4; 4.5 (a layout partitioned by source leaves whole shards reusable)"
+core = true
+given = { request = "withdraw A", artifact = "E/shard-1" }
+expect = { action = "keep", byte_identical_afterwards = true }
+source = "hand-written table: shard 1 holds B's and Z's records only and receives no promoted or re-sourced record: the promotion of B's copy of X happens in release R1, and shard 1 already holds that record from src/B"
+
+[[row]]
+id = "c09.fixture.E/shard-2.action"
+question = "On the fixture, what action does shard 2 get?"
+plan = "5.5 Check 9; 4.1 (keep); 4.4"
+core = true
+given = { request = "withdraw A", artifact = "E/shard-2" }
+expect = { action = "keep", byte_identical_afterwards = true }
+source = "hand-written table: shard 2 holds B's and Z's records only"
+
+[[row]]
+id = "c09.fixture.E/shard-3.action"
+question = "On the fixture, what action does shard 3 get?"
+plan = "5.5 Check 9; 4.1 (rewrite: a shard re-tokenized)"
+core = true
+given = { request = "withdraw A", artifact = "E/shard-3" }
+expect = { action = "rewrite", records_removed = ["T"], documents_in_successor = 26 }
+source = "hand-written table: shard 3 holds T, which is retired; its successor is re-tokenized from the 26 unrelated records and shrinks (4.2)"
+
+[[row]]
+id = "c09.fixture.shards.counts"
+question = "On the fixture, how many shards of run E are rewritten and how many are kept?"
+plan = "5.5 Check 9; 4.1 (the report counts shards rewritten per layout); 5.2"
+core = true
+given = { request = "withdraw A", run = "E", layout = "partitioned" }
+expect = { counts = { keep = 2, rewrite = 1 }, keep = ["E/shard-1", "E/shard-2"], rewrite = ["E/shard-3"] }
+source = "hand-written table: the sum of the rows c09.fixture.E/shard-1.action to c09.fixture.E/shard-3.action; the one affected record of run E sits in shard 3 (5.1)"
+
+[[row]]
+id = "c09.fixture.mixtures"
+question = "On the fixture, which mixtures need a successor under withdraw A, and which are reused as they are?"
+plan = "1.1 (which mixtures need a successor); 2.1 Listings; 4.1 (keep: no ancestor is in scope); 5.5 Check 9"
+core = true
+given = { request = "withdraw A", artifact = "(listing)", state = "unmutated" }
+expect = { needs_successor = ["E/mix-2", "Y/mix-1", "K/mix-1"], kept = ["E/mix-1", "D/mix-1"] }
+source = "hand-written table: a mixture needs a successor exactly when its snapshot names a shard that is rewritten; the spec's mixtures E/mix-2, Y/mix-1 and K/mix-1 name shard 3, and E/mix-1 and D/mix-1 name shards 1 and 2 only. These are the mixtures that answer \"contains\" and \"does not contain\" in the rows c05.unmutated.*. Each list is compared as a set"
+
+[[row]]
+id = "c09.fixture.successor.E/shard-3"
+question = "On the fixture, what does the successor of shard 3 answer under withdraw A?"
+plan = "5.5 Check 9; 4.4"
+core = true
+given = { request = "withdraw A", artifact = "successor of E/shard-3" }
+expect = { answer = "does not contain" }
+source = "hand-written table: built with capture on from records of Z only; its map is whole and it holds no unresolved record (4.4)"
+
+[[row]]
+id = "c09.fixture.successor.R1"
+question = "On the fixture, what does the successor of R1 answer under withdraw A?"
+plan = "5.5 Check 9; 4.4; 2.3; L12"
+core = true
+given = { request = "withdraw A", artifact = "successor of R1" }
+expect = { answer = "does not contain" }
+source = "hand-written table: it holds X from B's copy and 20 unrelated rows; B's copy is outside a withdrawal of A (L12)"
+
+[[row]]
+id = "c09.fixture.R1-history"
+question = "On the fixture, does the historical R1 still answer \"contains\" for A after the repair?"
+plan = "5.5 Check 9; 4.4"
+core = true
+given = { request = "withdraw A", artifact = "R1", state = "r.successor-registered" }
+expect = { answer = "contains" }
+source = "hand-written table: history keeps its attribution (4.4)"
+
+# ---------------------------------------------------------------------------------
+# Run E after "withdraw A": restart points and stale caches
+# ---------------------------------------------------------------------------------
+
+[[row]]
+id = "c09.E.exposure-free-restart"
+question = "On run E, which checkpoint is the exposure-free restart?"
+plan = "5.5 Check 9; 4.3; Decision 23"
+core = true
+given = { request = "withdraw A", run = "E" }
+expect = { exposure_free_restart = "E@6" }
+source = "hand-written table: checkpoint 6 is the last checkpoint whose consumed history is completely traced, passes the proof and holds no exposure; checkpoint 9 holds the read of T at step 7"
+
+[[row]]
+id = "c09.E.exact-rerun-restart"
+question = "On run E, does the exact-rerun restart equal the first step at which the corrected run's order differs from the historical one?"
+plan = "5.5 Check 9; 4.3; F7; Decision 23"
+core = true
+given = { request = "withdraw A", run = "E", corrected_run = "same settings and seed, shard 3 without T, built from an empty cache folder" }
+expect = { exact_rerun_restart_step = "pending:positions.exact_rerun_restart.step", not_before_step = 7 }
+expect_under = { F7 = { exact_rerun_restart = "the phase start, step 7, stated as an assumption", step_comparison = "not possible" } }
+source = "the oracle's log: the first step at which the log of the corrected from-scratch run differs from the log of run E. Hand-written bound: segment 1 trains on shards 1 and 2, which the repair keeps byte-identical, so no step before 7 can differ"
+
+[[row]]
+id = "c09.E.stale-cache.E/seg-2"
+question = "Are the cache files of E/seg-2, whose mixture digest differs from the corrected mixture, detected as stale and rebuilt?"
+plan = "5.5 Check 9; 4.4 (stale index caches); 3.5"
+core = true
+given = { request = "withdraw A", run = "E", segment = "E/seg-2" }
+expect = { stale = true, rebuilt = true, rebuilt_from = "an empty cache folder" }
+source = "hand-written table: the corrected mixture holds the successor of shard 3, so its digest differs from the snapshot the caches were built for; Megatron does not check the content, so the corrected order needs an empty cache folder (4.4)"
+
+[[row]]
+id = "c09.E.stale-cache.E/seg-1"
+question = "Are the cache files of E/seg-1 left alone?"
+plan = "5.5 Check 9; 4.4"
+core = true
+given = { request = "withdraw A", run = "E", segment = "E/seg-1" }
+expect = { stale = false }
+source = "hand-written table: the mixture of segment 1 is shards 1 and 2, both kept byte-identical, so its digest equals the snapshot"
