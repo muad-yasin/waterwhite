@@ -53,6 +53,9 @@ INDEX_MAGIC = b"MMIDIDX\x00\x00"
 INDEX_VERSION = 1
 _HEADER = struct.Struct("<9sQBQQ")  # magic, version, dtype code, S, D: 34 bytes
 _DTYPE_CODES = frozenset(range(1, 9))  # the codes the layout defines
+# The size in bytes of one item, by the dtype code (as Megatron's DType.size gives it,
+# checked against core_v0.20.0): uint8, int8, int16, int32, int64, float64, float32, uint16.
+_ITEM_SIZES = {1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 6: 8, 7: 4, 8: 2}
 _READ_CHUNK = 1 << 20  # bytes passed over at a time when they are only digested
 
 # The token type of a .bin file, by the code its index names, as the layout
@@ -184,6 +187,26 @@ def _array(data: bytes, dtype: str, count: int, where: str) -> np.ndarray:
     return np.frombuffer(data, dtype=dtype)
 
 
+def _check_offsets(lengths: np.ndarray, offsets: np.ndarray, code: int, where: str) -> None:
+    """Megatron reads a sequence at the byte offset the index stores (core_v0.20.0,
+    ``indexed_dataset.py``: ``__getitem__`` and ``get`` read at ``sequence_pointers``),
+    while Waterwhite takes a sequence's place from the lengths. For the contiguous
+    layout it supports, the offset of sequence i is the item size times the lengths
+    before it; an index whose stored offsets differ would show Waterwhite one document
+    and Megatron another, so it is refused."""
+    expected = np.zeros(lengths.size, dtype=np.int64)
+    if lengths.size > 1:
+        np.cumsum(lengths[:-1].astype(np.int64), out=expected[1:])
+    expected *= _ITEM_SIZES[code]
+    wrong = np.flatnonzero(offsets != expected)
+    if wrong.size:
+        first = int(wrong[0])
+        raise UnsupportedFormat(
+            f"the byte offset of sequence {first} in the index is {int(offsets[first])}, "
+            f"the lengths give {int(expected[first])}: Megatron reads the stored offsets: {where}"
+        )
+
+
 def _index_from(take, pass_over, size: int, where: str) -> ShardIndex:
     """The index, from the bytes ``take`` gives in file order."""
     head = take(_HEADER.size)
@@ -202,7 +225,8 @@ def _index_from(take, pass_over, size: int, where: str) -> ShardIndex:
             f"index file holds {size} bytes, its header needs {needed}: {where}"
         )
     lengths = _array(take(4 * sequences), "<i4", sequences, where)
-    pass_over(8 * sequences)  # the byte offsets; not needed here
+    offsets = _array(take(8 * sequences), "<i8", sequences, where)
+    _check_offsets(lengths, offsets, code, where)
     documents = _array(take(8 * entries), "<i8", entries, where)
     if entries < 1 or int(documents[0]) != 0:
         raise UnsupportedFormat(f"document index does not start at 0: {where}")

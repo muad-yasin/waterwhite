@@ -460,7 +460,10 @@ does not hold yet is still written.
   The document count is the number of documents that hold tokens. A line that gave
   no tokens leaves a boundary with no sequence in the index and adds no ordinal.
   A shard in which a document holds more than one sequence is refused as an
-  unsupported format.
+  unsupported format. So is a shard whose stored byte offsets are not the running
+  sum of its sequence lengths times the item size of its token type: Megatron
+  reads a document at the stored offset and Waterwhite takes the place from the
+  lengths, so a shard in which the two differ would show them different documents.
 - A shard's tokens: `artifact_files` is the one reader of the shard format in the
   tool. `token_dtype(code)` names the token type of the `.bin` file for the code
   its index gives (the two floating-point codes hold no token ids and are refused

@@ -215,10 +215,11 @@ The result is one of three words:
   That the log fits the file is shown only by the count and the token comparison
   passing.
 - That `run_tokenizer` ran the tokenizer unchanged, or as a separate process.
-- The byte offsets of the index. A document is located from the token counts of
-  the index, sequence after sequence, and the `.bin` file must have exactly the
-  size those counts give. A shard whose offsets say otherwise would be read at
-  the wrong place; with a `tokenize` function the token comparison then fails.
+- The byte offsets of the index are not used to locate a document: it is located
+  from the token counts of the index, sequence after sequence, and the `.bin` file
+  must have exactly the size those counts give. The index reader refuses a shard
+  whose stored offsets are not the running sum of its lengths times the item size
+  (docs/store.md), because Megatron reads at the stored offsets.
 
 ## 5. Labels
 

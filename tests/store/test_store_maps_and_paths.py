@@ -425,6 +425,34 @@ def test_a_document_is_read_from_its_own_byte_range(tmp_path):
         artifact_files.ShardTokens(tmp_path / "s32")
 
 
+def test_a_shard_whose_stored_offsets_are_not_the_running_sum_of_its_lengths_is_refused(world, tmp_path):
+    """Sol's review of a011cd5, finding 3. Megatron (core_v0.20.0, indexed_dataset.py:
+    ``__getitem__`` reads at ``sequence_pointers[idx]``) reads a document at the stored
+    byte offset; Waterwhite takes the offset from the lengths. For the contiguous layout
+    the two must agree, so a shard whose offsets do not is refused wherever the index is
+    read: by the reader, by the token reader and by the registration."""
+    documents = [[5, 6, 7], [8, 9]]
+    for name, code, letter, size in (("s32", 4, "i", 4), ("s16", 8, "H", 2)):
+        write_shard(tmp_path / name, documents, code, letter)
+        idx = Path(f"{tmp_path / name}.idx")
+        good = idx.read_bytes()
+        assert artifact_files.read_shard_index(idx).sequence_lengths.tolist() == [3, 2]
+        first = 34 + 4 * 2  # where the two offsets start
+        assert good[first:first + 16] == struct.pack("<2q", 0, 3 * size)
+        for label, offsets in (("swapped", (3 * size, 0)), ("shifted", (0, 3 * size + size))):
+            bad = good[:first] + struct.pack("<2q", *offsets) + good[first + 16:]
+            idx.write_bytes(bad)
+            with pytest.raises(errors.UnsupportedFormat, match="offset"):
+                artifact_files.read_shard_index(idx)
+            with pytest.raises(errors.UnsupportedFormat, match="offset"):
+                artifact_files.ShardTokens(tmp_path / name)
+            with pytest.raises(errors.UnsupportedFormat, match="offset"):
+                world.store.register_shard(
+                    tmp_path / name, name=f"{name}-{label}", step=step("tokenize"),
+                    inputs=[world.input])
+        idx.write_bytes(good)
+
+
 def test_the_command_line_migrates_a_version_1_store_that_every_reading_command_refuses(tmp_path):
     """A command that reads a store opens it read-only, so it cannot run a step;
     it refuses by name and names the command that can (plan 3.4)."""
