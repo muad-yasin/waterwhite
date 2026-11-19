@@ -1194,6 +1194,12 @@ def _unmet_conditions(made: dict, report: dict, *, sides_given: bool) -> list[st
             unmet.append(f"kept {entry['artifact']}: not compared")
     for entry in made["successors"]:
         name = entry["successor"]
+        # A successor is the same kind of artifact as the one it replaces: a mixture
+        # registered under the name of a shard's successor has no file to compare and
+        # reads "matches_sides" null, which is no evidence that it replaces the shard.
+        replaced = kinds.get(entry["artifact"])
+        if entry["registered"] and replaced is not None and entry["kind"] != replaced:
+            unmet.append(f"successor {name}: a {entry['kind']}, not the {replaced} it replaces")
         if not entry["registered"]:
             unmet.append(f"successor {name}: not registered")
         elif not v.is_negative_word(entry["answer"]):

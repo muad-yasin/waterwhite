@@ -1087,10 +1087,13 @@ where the report names nothing of the kind to compare (stated below):
 - every `kept` entry of a JSONL file or a shard has `identical` true (`"kept NAME: not
   identical"`, or `"kept NAME: not compared"` when the repaired side names no file for
   it). A kept mixture or checkpoint has no file and is not asked.
-- every `successors` entry is registered, answers "does not contain", and does not have
-  `matches_sides` false (`"successor NAME: not registered"`, `"successor NAME: may
-  contain"` or the word of whatever other answer it gave, `"successor NAME: not the file
-  compared"`).
+- every `successors` entry is registered, is the same kind of artifact as the one it
+  replaces, answers "does not contain", and does not have `matches_sides` false
+  (`"successor NAME: not registered"`, `"successor NAME: a mixture, not the shard it
+  replaces"` (the kinds being those of the successor and of the report's entry),
+  `"successor NAME: may contain"` or the word of whatever other answer it gave,
+  `"successor NAME: not the file compared"`). A successor of another kind has no
+  file of the kind to compare, so its `matches_sides` is null and would say nothing.
 - every `history` entry has `instance_unchanged` true (`"history NAME: instance changed"`).
 - every `caches` entry has an answer, and a stale one is rebuilt (`"caches SEGMENT: no
   answer"`, `"caches SEGMENT: stale, not rebuilt"`). A stale cache that is rebuilt holds:

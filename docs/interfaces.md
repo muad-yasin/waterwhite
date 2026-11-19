@@ -1635,7 +1635,10 @@ the successors registered, holds every instance of the report and is certified.
   artifact is registered under the successor's name; the verification is then not
   complete and says so. `matches_sides` says that the file the repaired side names has
   the digest the successor is registered with (null without `--sides`): an answer
-  about another file says nothing about the one that was compared.
+  about another file says nothing about the one that was compared. It is also null for
+  a successor that is not a file or shard, such as a mixture registered under the name
+  of a shard's successor: `verify --require-held` does not hold for it (docs/cli.md,
+  "Gating on the verification").
 - `history` has one entry for every artifact the report rewrites: the historical
   artifact still answers "contains" for the withdrawn source, because history keeps
   its attribution, and `instance_unchanged` is true when its instance id is the one

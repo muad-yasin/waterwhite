@@ -206,3 +206,24 @@ def test_a_report_that_names_a_shard_and_no_sides_file_never_holds(repair_world,
     assert code == NOT_HELD
     assert json.loads(out)["successors"][0]["answer"] == "does not contain"
     assert unmet_of(err) == ["sides: not given"]
+
+
+def test_a_successor_of_another_kind_than_the_artifact_it_replaces_never_holds(repair_world):
+    """Sol's review of a011cd5, finding 2: the report rewrites a shard, a clean mixture is
+    registered under the expected successor name, and both sides name the original shard.
+    A mixture has no file to compare, so ``matches_sides`` is null and nothing said the
+    successor is the wrong kind of artifact: the gate held and the exit code was 0."""
+    folder = repair_world.folder
+    copy_shard(folder, "shards/shard-3", "sides/both/shard-3")
+    report = write_json(folder / "report.json", hand_report(
+        repair_world, [("shard-3", "rewrite", "successor of mix-2")]))
+    both = {"shard-3": str(folder / "sides/both/shard-3")}
+    sides = write_json(folder / "sides.json", sides_document(both, both))
+    code, out, err = run(repair_world, "verify", "--report", str(report), "--sides", str(sides),
+                         "--mode", "seeded", "--require-held")
+    made = json.loads(out)
+    assert [(e["kind"], e["matches_sides"]) for e in made["successors"]] == [("mixture", None)]
+    assert made["per_shard_digests"] == "equal"
+    assert (code, unmet_of(err)) == (
+        NOT_HELD, ["successor successor of mix-2: a mixture, not the shard it replaces"])
+
