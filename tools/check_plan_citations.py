@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """List every plan citation in the repository and check that its target exists.
 
-The build plan is not part of this repository; code and docs cite it by section
-number. This script takes the plan's path, collects the anchors the plan defines
+The build plan is in this repository, as docs/WATERWHITE_BUILD_PLAN.markdown; code and docs
+cite it by section number. The tool does not read that file as one of the tracked files:
+its suffix is .markdown. This script takes the plan's path, collects the anchors the plan defines
 and reports every citation in the tracked files whose target is not among them.
 It checks that a target exists; whether the target says what the citing line
 claims is read by a person.
