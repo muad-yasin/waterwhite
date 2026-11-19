@@ -173,7 +173,7 @@ def read_shard_index(
                     count -= len(data)
 
         try:
-            index = _index_from(take, pass_over, size, where)
+            index = _index_from(take, size, where)
         except UnsupportedFormat:
             pass_over(None)
             raise
@@ -207,7 +207,7 @@ def _check_offsets(lengths: np.ndarray, offsets: np.ndarray, code: int, where: s
         )
 
 
-def _index_from(take, pass_over, size: int, where: str) -> ShardIndex:
+def _index_from(take, size: int, where: str) -> ShardIndex:
     """The index, from the bytes ``take`` gives in file order."""
     head = take(_HEADER.size)
     if len(head) != _HEADER.size:

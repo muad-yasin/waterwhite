@@ -400,7 +400,9 @@ Rules the store enforces:
   lie inside the hand-off of its harness log; otherwise `InvalidRecord`. When the
   log's hand-off is exactly one record, the edge must name it as a parent
   (DECISIONS.md D-21); an edge that marks it in scope only, or leaves it out, is
-  `InvalidRecord`.
+  `InvalidRecord`. An edge that leaves out any record of the hand-off, a parent or
+  in scope only, is `InvalidRecord` too, and a stored edge that does so gives no
+  bound to a negative.
 - **Handed texts.** `EdgeRecord.handed_texts` holds the texts a job was handed, each
   with its reference; `capture.generation_edge` copies them from the job's log, and
   the log's own `handed_texts` are compared too. The
