@@ -255,6 +255,52 @@ side, never merged: `answered` (the questions the subject could answer, a right 
 attempt and a question not attempted are no answer) and `right among answered`, in the whole summary and behind `tally`.
 The text holds no sentence that sets one tool against another.
 
+## Check 10 results
+
+This section gives the counts of the questions of Check 10 at each size label, with their sources. The README holds the table of the questions asked once (`README.md`, "Check 10 results"). The counts are the tally as the documents define it (the section "The summary" above; `fixture/table/README.md`, "Marks and the tally"). Each row has two counts, side by side and never merged: "answered", the questions for which it gave a right or a wrong answer, and "right among answered", the questions among those that it answered right. A question that the table leaves out of the tally is in neither count, and "questions in the tally" is the number left. For the six subjects of the run, the documents' words for the three grades are: right, "the reading gives the expected answer of the row asked"; wrong, "the reading gives another answer"; cannot answer, "the subject ran, and its own records lack the record or field the question needs". A cannot answer is not an answer and is in neither count. For the Waterwhite rows, "answered" and "right" both mean that the record ended "passed" (the core result) or that the test passed (the test run): the row matched the fields the table pins. A question with no passed record is in the tally and in neither count.
+
+| subject | size label | questions in the tally | answered | right among answered |
+|---|---|---|---|---|
+| Waterwhite (Checks 1 to 9 record, compared on tree c113fd44) | once | 362 | 353 | 353 |
+| Waterwhite (Checks 1 to 9 record, compared on tree c113fd44) | small | 17 | 17 | 17 |
+| Waterwhite (Checks 1 to 9 record, compared on tree c113fd44) | 10k | 4 | 4 | 4 |
+| Waterwhite (Checks 1 to 9 record, compared on tree c113fd44) | 100k | 17 | 17 | 17 |
+| Waterwhite, generating-model questions, switch on (test run on the tree of the first commit) | once | 9 | 9 | 9 |
+| Dolma toolkit | once | 362 | 18 | 17 |
+| Dolma toolkit | small | 17 | 7 | 7 |
+| Dolma toolkit | 10k | 4 | 1 | 1 |
+| Dolma toolkit | 100k | 17 | 7 | 7 |
+| OriginBlame | once | 362 | 25 | 14 |
+| OriginBlame | small | 17 | 2 | 2 |
+| OriginBlame | 10k | 4 | 0 | 0 |
+| OriginBlame | 100k | 17 | 2 | 2 |
+| File-level manifest | once | 362 | 138 | 102 |
+| File-level manifest | small | 17 | 0 | 0 |
+| File-level manifest | 10k | 4 | 0 | 0 |
+| File-level manifest | 100k | 17 | 0 | 0 |
+| Positions-only step trace | once | 313 | 1 | 1 |
+| Positions-only step trace | small | 17 | 0 | 0 |
+| Positions-only step trace | 10k | 4 | 0 | 0 |
+| Positions-only step trace | 100k | 17 | 0 | 0 |
+| Dolma toolkit with the trace | once | 313 | 48 | 33 |
+| Dolma toolkit with the trace | small | 17 | 7 | 7 |
+| Dolma toolkit with the trace | 10k | 4 | 1 | 1 |
+| Dolma toolkit with the trace | 100k | 17 | 7 | 7 |
+| OriginBlame with the trace | once | 313 | 80 | 27 |
+| OriginBlame with the trace | small | 17 | 2 | 2 |
+| OriginBlame with the trace | 10k | 4 | 0 | 0 |
+| OriginBlame with the trace | 100k | 17 | 2 | 2 |
+
+A size label says at which size a question is put: `once` is a question asked once, and `small`, `10k` and `100k` are the sizes at which the other questions are asked; the small set is kept apart from the plan sizes (the section "The summary" above). Each row of the table is one subject, or one Waterwhite source, at one size label. The rows of the six subjects of the run agree with the `tally` lines of the run's `summary.txt` and are made from the run's answer file (sha256 `9f19fd752f44b57fcc10d62f6f01f323b597539bfb915d880917e6eb95be9477`), which is not in this repository. Over the four labels, the trace and the two combinations have 49 questions each that the table leaves out of the tally; the other three of the six have none. No question is left out of the Waterwhite rows. The row of Waterwhite in the README is the sum of the two Waterwhite rows for the questions asked once: 353 + 9 = 362.
+
+- **Dolma toolkit** 1.2.1, run on Python 3.12.13: the toolkit's tokenizer is run on the chunk files, rows are selected by source, and the id of each row is resolved to the file that holds it.
+- **OriginBlame** 0.2.2 (rust-originblame, commit 622e3513), run on Python 3.12.13: on a fresh copy of the store, the native by-sources call with the sections of the files of the members the request names, called once; then generate-set; bits read least significant first.
+- **File-level manifest**: a file-level manifest exported from the store of a build that holds one.
+- **Positions-only step trace**: a record of what a training step read: step, shard, ordinal and token range.
+- **The two combinations**: the history is read from the trace (the checkpoint's segment up to its step, then the history of its parent checkpoint), each trace row is tied to the tool's record for its document, and that record is read.
+
+The first Waterwhite row is from the committed core result (`tests/acceptance/core_result/`): its 391 core rows ended passed, each recorded on the tree `1c132e32` (2 of them on a later tree, named in the file's header) and compared equal on the tree `c113fd44`. That record was made with every extension switched off, so it holds no answer for the 9 generating-model questions: they count in the first row's tally and in neither of its counts. The second Waterwhite row is for those 9 questions, from the test run on the tree of this repository's first commit with the rule on (11 tests, all passed; junit file sha256 `ba32ddf042f5dd415213afe1832b7c8dd677b5058617c17daf53a19bd48ffb66`); that record is not in this repository, and neither of the trees `1c132e32` and `c113fd44` is in its history. The questions are Waterwhite's own. For the core rows, `tests/acceptance/README.md` says that the table was written by hand before the tool existed and that a row is never changed to fit an answer, and `fixture/table/README.md` says that no row comes from an output of the tool.
+
 ## The world builder (temporary section WORLD)
 
 `python -m baselines.world` builds the world a run is put to, with the repository's own builders

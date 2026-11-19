@@ -58,11 +58,8 @@ FULL run, long rows included.
 
 ## What this tree is, against the tree of the records
 
-The records were made on an earlier state of the sources (the header names its tree; two records come from a later tree, see above). This tree differs from it: the fix-up D-CORE-5 (sources
-`coverage/__init__.py`, `extensions.py`, `listing.py`, `vocabulary.py`, the docs, DECISIONS.md and four
-tests), the fix-up D-CORE-6 (sources `cli.py` and `rebuild/verify_sides.py`, `docs/coverage.md`, DECISIONS.md and
-one new test: a switch that cannot be read is named before `report` reads a layout or `verify` reads its
-documents) and one more change of the core round (`tests/capture/test_hand_off_mark.py` changed,
-`tests/acceptance/mini_store.py` back to the fold's). The files of this folder and DECISIONS.md D-CORE-4 are new.
-The 10k and 100k records were made before the two fix-ups. A run on a later tree is compared with `core_result_file.py diff`: the verdict is PARTIAL while the 31 long-run
-rows are not run.
+The records were made on an earlier state of the sources: the header names its tree under `tree`, and two records come from a later tree (see above). This tree, the one this page is in, differs from the tree of the records in 84 files: 12 under `src/`, 4 under `replica/`, 15 under `baselines/`, 6 under `fixture/`, 35 under `tests/`, 10 under `docs/`, and `README.md` and `DECISIONS.md`.
+
+A run of the core rows was compared with the file in this folder by `core_result_file.py diff` on a tree named `c113fd44`, an earlier state of the sources than this tree. The verdict was FULL: no difference in the core rows, 391 compared, 0 not run. That comparison was not repeated on this tree. This tree differs from `c113fd44` in 13 files (3 under `baselines/`, 4 under `tests/`, 4 under `docs/`, and `README.md` and `DECISIONS.md`). They are the code of `baselines/`, tests under `tests/baselines/`, pages of the documents and this page. None is under `src/`, `replica/`, `oracle/` or `fixture/`, and no Python file under `tests/acceptance/`, where the core rows are made, differs. The file in this folder is the same in both trees. Neither the tree of the records nor `c113fd44` is in this repository's history.
+
+For a later run, compare the core rows with `core_result_file.py diff`. When the rows compared all match, the verdict is PARTIAL if any core rows were not run here and FULL if every core row ran.

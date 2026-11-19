@@ -1625,8 +1625,7 @@ Each figure sits beside its workload (the cell's parameters) and the machine.
 | repair bytes | `waterwhite report withdraw A`, then `python -m replica repair`, on a copy of the store: the bytes of the historical build and of the store as it stood (read), and of the repaired build and the store's growth (rewritten) |
 | capture wiring | one static figure, `capture_wiring.json`: the code lines of `StoreCapture.generate` and `StoreCapture.record_generation`, with their line numbers, and the two places in `replica/build.py` that call them |
 
-Bytes, counts and line counts do not move with neighbours; the wall times and the figures that
-depend on them are timed inside the window file and with no non-cell neighbour.
+In the first measurement the bytes of a build folder and of a repair differed by a few bytes between runs of one setting, and the records do not say why. The wall times, and the figures made from them, can depend on what else the machine runs. When the caller supplies a window file, the runner holds it during the batch. The first measurement used no window file. The run records describe overlap among the runner's own builds. `docs/measurements.md` gives the conditions of the first measurement and the spread of its bytes.
 
 ### Machine
 
@@ -1635,6 +1634,8 @@ and the operating system, read from /proc and /etc at the start of the batch, an
 the code was taken from. This departs from risk RK3 of the plan (a laptop workload only): the
 project owner decided on 17 Nov 2026 to measure on the server (DECISIONS.md, the entry on
 the machine).
+
+The cores are those the operating system shows. On a virtual machine with shared virtual CPUs they are not dedicated cores, and the type string the caller gives is the place to say so.
 
 ### Runs at once, resume, failures
 

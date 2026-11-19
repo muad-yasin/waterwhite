@@ -236,6 +236,13 @@ The plan names "source not registered" for a withdrawal (plan 2.3); "member not
 registered" and "record not in source" are the build's additions, which plan 5.8,
 B-7 leaves to the builder (DECISIONS.md D-26).
 
+The store can hold a cycle through a model's own history. With the generating-model switch on, a
+recorded "contains" for the same artifact takes precedence. If the artifact's answer depends on
+the cycle, the query exits 2 with "temporal ancestry cycle". The store does not refuse a cycle
+when it is written (the write-time refusal is not built, see "Not built" below), so any path that
+writes to it can leave one. The listing stops at the first artifact whose answer depends on a
+cycle, and `report` and `verify` stop in the same way.
+
 A loud fault (exit 3) names one of "map count mismatch", "map digest mismatch",
 "edge parent missing", "trace sample count mismatch", "artifact digest mismatch",
 "stored digest mismatch", "locator domain mismatch", "cache digest conflict".
@@ -928,6 +935,7 @@ Refusals (exit 2, no report):
 | `--selector`, or `--record` not written `ARTIFACT:L<n>` | unsupported selector |
 | `report ban`, `report flagged` | extension off |
 | `report ban`, `report flagged` with the extension switched on in the store | request refused |
+| with the generating-model switch on, the answer of an artifact the report reaches would rest on a cycle through a model's own history and no recorded "contains" wins: the report stops at the first such artifact and produces no report on standard output | temporal ancestry cycle |
 | a store that is not there, not a store, or written by a newer build | not a store; store of a newer schema version |
 | the store written by another process while the command ran | store written during the query |
 
@@ -1028,6 +1036,8 @@ Refusals (exit 2): the refusals of `query withdraw` for the request the report h
 form, for a file the sides file names that is not there, and for a report that names
 an instance the store does not hold; "store written during the query"; "not a store". A report or sides file that cannot be read is "usage"
 (exit 1). A loud fault in the closure of an artifact it answers is exit 3.
+The refusals of `query withdraw` include "temporal ancestry cycle" (the list under that command): `verify`
+stops at the first artifact whose answer rests on such a cycle and prints no document.
 
 ### Gating on the verification
 
@@ -1113,3 +1123,5 @@ source file or wraps a tokenizer run: those are calls of a pipeline
 (`capture.ingest_jsonl`, `tokenmap.tokenize_shard`). No command switches an extension:
 the switch is a setting of the store (`Store.set_setting`, `docs/store.md`). No
 command builds a repaired artifact: the team's own builder does, from the report.
+The store does not refuse a cycle through a model's own history when it is written; a
+query whose answer depends on the cycle refuses (the list under `query withdraw`).
