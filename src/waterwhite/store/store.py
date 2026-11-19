@@ -283,6 +283,21 @@ def _check_edge(edge: object) -> None:
                 job=edge.harness_log.job_name, parent=sole.key,
             )
 
+        # Every record the job was handed is an input of its edge, used or in scope
+        # only (plan 3.3, Decision 25: a handed input the output does not state is
+        # listed in scope only). An edge that left one out would show the proof a
+        # parent list shorter than the hand-off, and a source whose record was
+        # handed could be answered "does not contain".
+        named = {item.parent for item in edge.inputs}
+        for ref in edge.harness_log.handed:
+            _need(
+                ref in named,
+                f"{what}: job {edge.harness_log.job_name!r} was handed {ref.key} and the "
+                "edge does not list it; every handed record is an input of the edge "
+                "(a parent, or in scope only)",
+                job=edge.harness_log.job_name, parent=ref.key,
+            )
+
 
 def _check_drop(drop: object) -> None:
     _need(isinstance(drop, DropRecord), f"expected a drop record, got {drop!r}")

@@ -291,6 +291,9 @@ then the file on disk, then what needs the store:
   (`LabelStrongerThanDerivation`);
 - a generation edge with a harness log whose inputs do not all lie in the log's
   hand-off (`InvalidRecord`);
+- a generation edge with a harness log that leaves out a record the log says was
+  handed: every handed record is an input of the edge, a parent or in scope only
+  (`InvalidRecord`; plan 3.3, Decision 25);
 - an edge that carries handed texts (`EdgeRecord.handed_texts`, or
   `HarnessLog.handed_texts` on its log) and breaks one of these rules
   (`InvalidRecord`): the texts are a tuple; each is a (reference, text) pair whose

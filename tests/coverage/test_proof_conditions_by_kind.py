@@ -196,3 +196,28 @@ def test_an_input_outside_the_hand_off_denies_the_bound(world, ask):
     assert (answer["answer"], answer["names"]) == ("may contain", v.NAMES_BOUND_NOT_ESTABLISHED)
     assert link(answer, "condition", "job", "artifact", "record") == {
         "condition": "g", "job": "job-two", "artifact": "gen/J2", "record": "L1"}
+
+
+def test_a_handed_record_the_edge_leaves_out_denies_the_bound(world, ask):
+    """Sol's review of a011cd5, finding 1: a job was handed two records of Z and its log
+    reads one; the edge lists both. Then the row of the second input leaves the edge (a
+    store edited from outside, which the write would have refused). The stored log still
+    holds the record, so the bound is not established and no "does not contain" may rest
+    on this edge."""
+    z = world["src/Z"]
+    first, second = ww_world.ref(z, 1), ww_world.ref(z, 2)
+    log = HarnessLog(
+        "job-left-out", "log-digest-job-left-out", (first, second), (HarnessRead(occurrence=first),),
+        "none", harness=v.HARNESS_CONFINED)
+    edge = EdgeRecord(
+        "L1", (EdgeInput(first, used=True), EdgeInput(second, used=False)), ww_world.step("generate"),
+        is_generation=True, harness_log=log, job_name="job-left-out",
+        handed_texts=tuple((r, ww_world.TEXTS[(r.instance_id, r.locator)]) for r in (first, second)))
+    world.ids["gen/J3"] = ww_world.record(
+        world.store, world.folder / "gen/J3.jsonl", ["made from two z lines"], "gen/J3",
+        v.ROLE_INTERMEDIATE, ww_world.step("job-left-out"), [z], [edge])
+    assert ask("A", "gen/J3")["answer"] == "does not contain"
+    world.sql(("DELETE FROM edge_input WHERE edge_id = ? AND occurrence_id = ?",
+               (world.edge_id("gen/J3", 1), world.occurrence_id("src/Z", 2))))
+    answer = ask("A", "gen/J3")
+    assert (answer["answer"], answer["names"]) == ("may contain", v.NAMES_BOUND_NOT_ESTABLISHED)

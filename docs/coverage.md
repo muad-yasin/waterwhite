@@ -366,7 +366,8 @@ edge names no parent"), for every source, and the record is never "does not cont
   the harness let through (a refused attempt is listed in the scope and does not
   break the bound, DECISIONS.md D-07); the log is the log of the job the edge
   names; the edge's stored bound field says established; every input of the edge
-  lies in the log's hand-off. The stored field alone never establishes a bound,
+  lies in the log's hand-off, and every record the log says was handed is an input
+  of the edge (a parent, or in scope only). The stored field alone never establishes a bound,
   and a field that says "not established" denies it. A mapped edge never has a
   bound. A generation edge with no harness log (a job that wrote its own parent
   list) has none. Otherwise: "may contain" naming "upper bound not established"

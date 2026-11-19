@@ -487,8 +487,10 @@ class Session:
         """Condition 2.2(g): the upper bound of a generation edge. It is read from
         the stored harness log (the log lists no read outside the hand-off that the
         harness let through), the log is the log of the job the edge names, the
-        stored field must agree, every input must lie in the hand-off, and a
-        mapped edge never has one (plan 3.3, Decision 13)."""
+        stored field must agree, every input must lie in the hand-off, every record
+        the log says was handed must be an input of the edge (a parent or in scope
+        only: an edge that leaves one out shows a shorter parent list than the
+        hand-off), and a mapped edge never has one (plan 3.3, Decision 13)."""
         log = edge.harness_log
         if not edge.is_generation or edge.label != v.OBSERVED or log is None:
             return False
@@ -497,7 +499,8 @@ class Session:
         if not edge.bound_field or not log.bound_established():
             return False
         handed = set(log.handed)
-        return all(item.parent in handed for item in edge.inputs)
+        named = {item.parent for item in edge.inputs}
+        return all(item.parent in handed for item in edge.inputs) and handed <= named
 
     def _edge(self, ref: OccurrenceRef, edge: StoredEdge) -> Generator[OccurrenceRef, Status, Status]:
         where = f"{self.name(ref.instance_id)}:{ref.locator}"

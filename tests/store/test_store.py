@@ -864,6 +864,20 @@ def test_a_generation_parent_outside_the_hand_off_is_refused(world):
     assert table_counts(world.store) == before
 
 
+def test_a_generation_edge_that_leaves_out_a_handed_record_is_refused(world):
+    """Sol's review of a011cd5, finding 1: every record the job was handed is an input
+    of its edge (used, or in scope only); an edge that omits one would let the proof
+    reach "does not contain" for a source whose record the job was handed."""
+    a1, a2 = world.ref(world.A, 1), world.ref(world.A, 2)
+    log = HarnessLog("two-handed", "d", (a1, a2), (HarnessRead(occurrence=a1),), "none")
+    before = table_counts(world.store)
+    with pytest.raises(errors.InvalidRecord, match="handed"):
+        generation_file(world, "omits", log, [EdgeInput(a1)])
+    assert table_counts(world.store) == before
+    # the same log with both records on the edge is registered
+    generation_file(world, "keeps", log, [EdgeInput(a1), EdgeInput(a2, used=False)])
+
+
 def test_in_scope_only_inputs_and_what_breaks_a_bound(world):
     s = world.store
     a1, a2, b1 = world.ref(world.A, 1), world.ref(world.A, 2), world.ref(world.B, 1)
