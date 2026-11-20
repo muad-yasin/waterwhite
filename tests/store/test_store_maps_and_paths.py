@@ -425,6 +425,28 @@ def test_a_document_is_read_from_its_own_byte_range(tmp_path):
         artifact_files.ShardTokens(tmp_path / "s32")
 
 
+def test_a_shard_whose_bin_is_not_the_size_its_index_gives_is_refused_at_registration(world, tmp_path):
+    """The outside review of 504bf64, finding 2. An index of two one-token documents and a
+    ``.bin`` of one token registered, took a map for both documents, and a query then
+    answered "does not contain" for a document whose tokens are not there. The token reader
+    already refuses the pair (it expects eight bytes and finds four); the registration reads
+    the same invariant, for a short file and for a long one."""
+    for label, size in (("short", 4), ("long", 12)):
+        write_shard(tmp_path / label, [[5], [6]])
+        bin_path = Path(f"{tmp_path / label}.bin")
+        bin_path.write_bytes((bin_path.read_bytes() + b"\x00" * 8)[:size])
+        before = world.store.artifact(label)
+        with pytest.raises(errors.UnsupportedFormat, match="its index gives 8"):
+            artifact_files.read_shard(tmp_path / label)
+        with pytest.raises(errors.UnsupportedFormat, match="its index gives 8"):
+            world.store.register_shard(
+                tmp_path / label, name=label, step=step("tokenize"), inputs=[world.input])
+        assert before is None and world.store.artifact(label) is None
+        # The one read that never refuses an index says why the shard cannot be counted.
+        found = artifact_files.read_shard_once(tmp_path / label)
+        assert found.document_count is None and "its index gives 8" in found.unreadable
+
+
 def test_a_shard_whose_stored_offsets_are_not_the_running_sum_of_its_lengths_is_refused(world, tmp_path):
     """The outside review of a011cd5, finding 3. Megatron (core_v0.20.0, indexed_dataset.py:
     ``__getitem__`` reads at ``sequence_pointers[idx]``) reads a document at the stored

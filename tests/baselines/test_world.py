@@ -2045,6 +2045,15 @@ def test_the_document_and_the_decisions_say_the_unseeded_files_are_compared_orde
         assert _banned_in(blocks[number]) == [], (number, _banned_in(blocks[number]))
 
 
+def test_the_readme_gives_the_cap_on_the_workers_of_the_large_branch():
+    """The outside review of 504bf64: the README said the larger branch builds a world "with
+    one worker per core"; the plan above caps the count (``MOST_WORKERS``), so on a machine with
+    more cores the statement was not what the test does."""
+    text = " ".join((REPO / "README.md").read_text(encoding="utf-8").split())
+    assert f"a worker for each core, at most {MOST_WORKERS}" in text
+    assert "one worker per core" not in text
+
+
 def _flag_values(argv):
     """The flags of one command and the word after each, in order (the values that name a path are kept as they are)."""
     words = [str(word) for word in argv]

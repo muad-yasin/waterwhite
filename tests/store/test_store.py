@@ -2455,6 +2455,26 @@ def test_map_rows_removed_with_a_lowered_count_are_found_by_the_count_of_the_ind
             s.check_integrity([world.mixture])
 
 
+def test_a_registered_shard_whose_bin_is_not_the_size_its_index_gives_stops_the_check(world):
+    """The outside review of 504bf64, finding 2, for a store that registered the pair before
+    registration refused it: the digest the store was edited to agree with is of the short
+    file, and the map's count cannot be held against a shard the token reader refuses. That
+    is the count fault, not a pass and not a negative proof."""
+    prefix = world.folder / "shards/shard-1"
+    bin_path = Path(f"{prefix}.bin")
+    bin_path.write_bytes(bin_path.read_bytes()[:-4])
+    cut = artifact_files.shard_digest_only(prefix)
+    copy = world.copy()
+    row = artifact_row(copy, world.shard)
+    edit(copy,
+         ("UPDATE artifact SET content_digest = ? WHERE artifact_id = ?", (cut, row)),
+         ("UPDATE binding SET declared_digest = ? WHERE artifact_id = ?", (cut, row)))
+    with Store.open(copy, readonly=True) as s:
+        with pytest.raises(errors.MapCountMismatch, match="cannot be read to count them") as caught:
+            s.check_integrity([world.shard])
+        assert "its index gives" in caught.value.context["unreadable"]
+
+
 def test_a_registered_shard_whose_index_cannot_be_counted_stops_the_check(world):
     """An index that cannot be read as an index, under a digest the store was
     edited to agree with: the map's count cannot be held against the file, and
