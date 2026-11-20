@@ -162,7 +162,7 @@ The table gives the build-folder size for each capture mode and the store-file s
 
 ## Query, proof walk and repair
 
-The query times and proof walk times in this section are the first commit's figures. A later commit changed the statement of the store that finds the trace rows of one document; these times were not measured again with it.
+The query times and proof walk times in this section are the first commit's figures, from the server. A later commit changed the statement of the store that finds the trace rows of one document; these times were not measured again with it. Only the workload of 2,000 characters, one derivation, four sources and the partitioned layout, at 10,000 and 100,000 records, was measured again, on a laptop; its figures and its setup are in the README, under "Measured costs".
 
 Capture-on runs only: a capture-off run has no store to query or repair. The query times `waterwhite query withdraw A --artifact probe@N` for one artifact. `probe@N` is the checkpoint the probe run registers at its last step, and N is the number of steps that run reports, so it differs between workloads. The proof walk times `waterwhite query withdraw A` across the store. The replica runs the repair on a copy of the store. It counts the historical build size and the starting store size as bytes read. It counts the repaired build size and the increase in store size as bytes rewritten. These are sizes of files, not measured disk I/O.
 
@@ -211,7 +211,7 @@ Capture-on runs only: a capture-off run has no store to query or repair. The que
 
 ## The confined harness
 
-The workload of 10,000 records, 2,000 characters, 1 derivation, 4 sources and the partitioned layout was also run under the confined harness, with capture on, in three runs per worker setting and three at once. It is a separate figure and not one of the 240. These runs were not sampled, so they have no peak memory.
+The workload of 10,000 records, 2,000 characters, 1 derivation, 4 sources and the partitioned layout was also run under the confined harness, with capture on, in three runs per worker setting and three at once. It is a separate figure and not one of the 240. These runs were not sampled, so they have no peak memory. Their query time and proof walk time are the first commit's figures too, from before the change of the statement of the store.
 
 | records | characters | derivations | sources | layout | workers | throughput (records/s) | build folder (bytes) | store file (bytes) | per record / parent link / step trace (bytes) | query time (s) | proof walk time (s) | repair reads / rewrites (bytes) | peak memory | runs |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
