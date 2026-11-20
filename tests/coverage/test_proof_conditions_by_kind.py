@@ -82,6 +82,22 @@ def test_a_trace_row_that_names_an_ordinal_the_map_does_not_hold(world, ask):
         "condition": "a", "artifact": "shard-3", "record": "D99", "segment": "Y/seg-1", "step": 2}
 
 
+def test_a_trace_row_whose_segment_is_not_its_traces_segment_is_a_read_the_segment_does_not_hold(world, ask):
+    """The audit of a078390: ``trace_hits`` finds a segment's rows through the segment each row
+    stores, and the walk lists a segment's documents through the trace of each step. A row
+    whose stored segment is empty (or another's) left the document listed and with no row to
+    read: the read was taken for one in an uncovered range, and the answer stayed "does not
+    contain". It is the same class as an ordinal the map does not hold, and has the same
+    answer: the step read a document the segment's rows do not hold."""
+    assert ask("A", "Y@2")["answer"] == "does not contain"
+    world.sql(("UPDATE trace_row SET segment_id = NULL WHERE trace_id = ?",
+               (world.trace_id("Y/seg-1", 2),)))
+    answer = ask("A", "Y@2")
+    assert (answer["answer"], answer["names"]) == ("may contain", v.NAMES_MISSING_ORIGIN)
+    shown = link(answer, "condition", "artifact", "segment", "step")
+    assert shown == {"condition": "a", "artifact": "shard-3", "segment": "Y/seg-1", "step": 2}
+
+
 # --- (b) --------------------------------------------------------------------------------
 
 

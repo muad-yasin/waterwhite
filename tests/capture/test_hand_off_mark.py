@@ -508,7 +508,8 @@ def test_a_migration_that_stops_in_a_later_step_still_names_what_the_earlier_ste
     """The audit of a078390: the note was made once the last step had run, from the version the
     store was found at, so a store of schema 3 whose step 5 stopped (the first step whose time
     grows with the data) kept the change step 4 had committed, every log read as not compared,
-    and neither run said so: the first ended in a traceback and the retry named step 5 only."""
+    and neither run said so. A database error is refused naming the step, and the note of the
+    first run and of the run that finishes both carry step 4's sentence."""
     from waterwhite.store import _migrate
 
     w = build(tmp_path)
@@ -533,10 +534,43 @@ def test_a_migration_that_stops_in_a_later_step_still_names_what_the_earlier_ste
     raw = sqlite3.connect(w.db)
     assert raw.execute("SELECT value FROM meta WHERE key = 'schema_version'").fetchone()[0] == "4"
     raw.close()
-    # the retry reaches 5 and says what step 5 changes
+    # the retry reaches 5 and still says what step 4 changed: it was recorded with the step
     monkeypatch.setitem(_migrate.STEPS, 5, real)
     out, err = io.StringIO(), io.StringIO()
     assert cli.main(["migrate", "--store", str(w.db)], stdout=out, stderr=err) == 0, err.getvalue()
     said = json.loads(out.getvalue())
-    assert (said["migrated"]["from"], said["migrated"]["to"]) == (4, 5)
-    assert "waterwhite check" in said["migrated"]["note"] and "compare-hand-off" not in said["migrated"]["note"]
+    assert (said["migrated"]["from"], said["migrated"]["to"]) == (3, 5)
+    assert "compare-hand-off" in said["migrated"]["note"] and "waterwhite check" in said["migrated"]["note"]
+
+
+def test_a_migration_that_is_killed_in_a_later_step_does_not_lose_the_sentence_of_the_earlier_one(
+        tmp_path, monkeypatch):
+    """Ruling of the lead: each committed step's note is recorded in that step's own transaction.
+    A process killed in step 5 (here an interrupt, which is no database error and is not caught)
+    leaves step 4 committed and its sentence recorded; the next run that finishes names it."""
+    from waterwhite.store import _migrate
+
+    w = build(tmp_path)
+    try:
+        register(w, edge_for(w, [Handed(w.ref_a, TEXT_A)]))
+    finally:
+        w.store.close()
+    _step_back_to_version_3(w.db)
+    real = _migrate.STEPS[5]
+
+    def interrupted(conn):
+        raise KeyboardInterrupt
+
+    monkeypatch.setitem(_migrate.STEPS, 5, interrupted)
+    with pytest.raises(KeyboardInterrupt):
+        cli.main(["migrate", "--store", str(w.db)], stdout=io.StringIO(), stderr=io.StringIO())
+    monkeypatch.setitem(_migrate.STEPS, 5, real)
+    out, err = io.StringIO(), io.StringIO()
+    assert cli.main(["migrate", "--store", str(w.db)], stdout=out, stderr=err) == 0, err.getvalue()
+    said = json.loads(out.getvalue())
+    assert (said["migrated"]["from"], said["migrated"]["to"]) == (3, 5), said
+    assert "compare-hand-off" in said["migrated"]["note"]
+    # once said, it is said: a store that is already at the version runs no step and has no note
+    out, err = io.StringIO(), io.StringIO()
+    assert cli.main(["migrate", "--store", str(w.db)], stdout=out, stderr=err) == 0
+    assert "migrated" not in json.loads(out.getvalue())

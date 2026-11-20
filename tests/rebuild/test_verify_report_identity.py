@@ -189,3 +189,64 @@ def test_a_successor_of_another_kind_is_not_read_as_the_file_the_repaired_side_n
     assert [(e["kind"], e["matches_sides"]) for e in made["successors"]] == [(v.KIND_SHARD, None)]
     assert json.loads(err)["unmet"] == [
         "successor successor of shard-3: kind shard, but the artifact it replaces is of kind jsonl"]
+
+
+# --- The check the lead asked for on the rewrite exemption ------------------------------------
+
+
+def test_a_rewrite_row_named_for_a_shard_whose_instance_and_kind_are_a_mixture_never_holds(repair_world):
+    """A rewrite row named shard-3 whose instance and stated kind are a mixture the store really
+    holds, with a mixture successor: the exemption lets the name resolve elsewhere, so only the
+    history entry stands in the way. It must."""
+    folder = repair_world.folder
+    copy_shard(folder, "shards/shard-3", "sides/both/shard-3")
+    report = hand_report(repair_world, [("mix-2", "rewrite", "successor of mix-2")])
+    report["artifacts"][0]["artifact"] = "shard-3"
+    both = {"shard-3": str(folder / "sides/both/shard-3")}
+    sides = write_json(folder / "sides.json", sides_document(both, both))
+    code, out, err = run(repair_world, "verify", "--report", str(write_json(folder / "report.json", report)),
+                         "--sides", str(sides), "--mode", "seeded", "--require-held")
+    assert code == NOT_HELD, (code, err)
+    assert "history shard-3: instance changed" in json.loads(err)["unmet"]
+
+
+# --- Text the report cannot carry into a path or a query ---------------------------------------
+
+BAD_TEXT = {
+    "a NUL in a successor": lambda r: r["artifacts"][0].__setitem__("successor", "x\u0000y"),
+    "a NUL in a rewritten name": lambda r: r["artifacts"][0].__setitem__("artifact", "R1\u0000"),
+    "a lone surrogate in a successor": lambda r: r["artifacts"][0].__setitem__("successor", "\ud800"),
+    "a lone surrogate in an instance": lambda r: r["artifacts"][0].__setitem__("instance", "\ud800"),
+    "a lone surrogate in the source": lambda r: r["request"].__setitem__("source", "\ud800"),
+    "a NUL in a member": lambda r: r["request"].__setitem__("members", ["A/r1\u0000"]),
+}
+
+
+@pytest.mark.parametrize("label", list(BAD_TEXT))
+def test_text_that_cannot_be_a_name_or_a_path_is_a_refusal_not_a_crash(repair_world, tmp_path, label):
+    """The audit of a078390: a NUL ends a path lookup in ValueError and a lone surrogate cannot be
+    bound to a query; the command ended in a traceback where the contract says exit 2."""
+    report = hand_report(repair_world, [("R1", "rewrite", "successor of R1")])
+    BAD_TEXT[label](report)
+    report_path, sides = r1_files(repair_world, tmp_path, report)
+    path = report_path.with_name("report-bad.json")
+    path.write_text(json.dumps(report), encoding="utf-8")
+    code, out, err = run(repair_world, "verify", "--report", str(path), "--sides", str(sides), "--require-held")
+    assert (code, out) == (REFUSED, ""), (label, err[-300:])
+    assert error_of(err)["error"] == "request refused", (label, err)
+
+
+def test_a_sides_path_or_name_with_a_nul_is_a_refusal_not_a_crash(repair_world, tmp_path):
+    report = hand_report(repair_world, [("R1", "rewrite", "successor of R1")])
+    report_path, sides = r1_files(repair_world, tmp_path, report)
+    for where in ("repaired", "reference"):
+        held = json.loads(sides.read_text())
+        held[where]["R1"] = held[where]["R1"] + "\u0000"
+        bad = write_json(tmp_path / f"sides-nul-{where}.json", held)
+        code, out, err = run(repair_world, "verify", "--report", str(report_path), "--sides", str(bad))
+        assert (code, out, error_of(err)["error"]) == (REFUSED, "", "request refused"), (where, err)
+    held = json.loads(sides.read_text())
+    held["reference"]["R1\ud800"] = "x"
+    bad = write_json(tmp_path / "sides-surrogate.json", held)
+    code, out, err = run(repair_world, "verify", "--report", str(report_path), "--sides", str(bad))
+    assert (code, out, error_of(err)["error"]) == (REFUSED, "", "request refused"), err

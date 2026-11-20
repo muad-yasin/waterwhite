@@ -233,3 +233,90 @@ def test_check_reads_the_shard_files_outside_its_write_transaction_and_writes_no
     assert reader.execute("PRAGMA data_version").fetchone()[0] == before  # nothing was committed
     reader.close()
     world.store = Store.open(world.path)
+
+
+# --- The narrow form: only the answers that rest on the shard are withheld ----------------
+
+
+def withheld_names(document: dict) -> set[str]:
+    return {entry["artifact"] for entry in document["withheld"]}
+
+
+def test_a_listing_withholds_only_the_answers_that_rest_on_an_archived_unchecked_shard(world):
+    """Ruling of the lead on the audit of a078390: one archived shard no longer stops the whole
+    listing. The answers that rest on it are named, each with its reason, the others are
+    printed as before, and the command still does not exit 0 (3, the fault's own code)."""
+    code, out, err = cli_run(world, "query", "withdraw", "C")
+    assert code == 0, err
+    before = json.loads(out)
+    forget_checks(world)
+    put_away(world)
+    code, out, err = cli_run(world, "query", "withdraw", "C")
+    assert code == errors.EXIT_INTEGRITY, err
+    after = json.loads(out)
+    names = withheld_names(after)
+    assert "shard-1" in names
+    answered = {a["artifact"]: a for a in after["answers"]}
+    assert names.isdisjoint(answered)
+    assert names | set(answered) == {a["artifact"] for a in before["answers"]}  # nothing dropped silently
+    for name, answer in answered.items():  # what does not rest on the shard is what it was
+        assert answer == next(a for a in before["answers"] if a["artifact"] == name), name
+    for entry in after["withheld"]:
+        assert entry["error"] == "shard files not checked" and world["shard-1"] in entry["reason"], entry
+    said = json.loads(err)
+    assert said["error"] == "shard files not checked" and said["withheld"] == len(after["withheld"])
+
+
+def test_a_report_withholds_the_artifacts_that_rest_on_an_archived_unchecked_shard(world):
+    forget_checks(world)
+    put_away(world)
+    code, out, err = cli_run(world, "report", "withdraw", "C")
+    assert code == errors.EXIT_INTEGRITY, err
+    report = json.loads(out)
+    assert "shard-1" in withheld_names(report)
+    entries = {e["artifact"]: e for e in report["artifacts"]}
+    assert entries["shard-1"]["action"] == "unresolved"
+
+
+def test_the_documents_of_an_archived_unchecked_shard_that_answers_contains_are_not_judged(world):
+    """The audit of a078390 (the gate's second finding): a shard that answers "contains" never
+    reached the gate, and the report judged each of its documents through a map whose offsets
+    nothing could vouch for, here the review's swapped offsets: "remove D0, keep D1" where a
+    reader that goes by the index reads the tokens of the other document. The shard is
+    withheld, with no document judged."""
+    swap_the_offsets(world)
+    forget_checks(world)
+    put_away(world)
+    code, out, err = cli_run(world, "report", "withdraw", "B")
+    assert code == errors.EXIT_INTEGRITY, err
+    report = json.loads(out)
+    assert "shard-1" in withheld_names(report)
+    entry = next(e for e in report["artifacts"] if e["artifact"] == "shard-1")
+    assert (entry["action"], entry["removed"], entry["documents_in_successor"]) == ("unresolved", [], None)
+
+
+def test_check_gives_its_verdict_on_a_store_it_cannot_write_and_says_nothing_was_recorded(world):
+    """Ruling of the lead: ``check`` never fails only because the write is refused. On a store
+    file the user cannot write it reads the shards, says what it found, and says that nothing
+    was recorded (a legacy shard read as passed stays unchecked in the store)."""
+    import os
+    import stat
+
+    forget_checks(world)
+    world.store.close()
+    folder = world.folder
+    saved = {path: stat.S_IMODE(os.stat(path).st_mode) for path in (folder, world.path)}
+    os.chmod(world.path, 0o444)
+    os.chmod(folder, 0o555)
+    try:
+        out, err = io.StringIO(), io.StringIO()
+        code = cli.main(["check", "--store", str(world.path)], stdout=out, stderr=err)
+        said = json.loads(out.getvalue() or err.getvalue())
+        assert code == 0, said
+        assert said["check"] == "passed" and said["shard_records"].startswith("not recorded"), said
+        assert said["shards_not_passed"] == []  # the read just made found them shards of this layout
+    finally:
+        for path, mode in saved.items():
+            os.chmod(path, mode)
+    world.store = Store.open(world.path)
+    assert world.store.shard_files_state(world["shard-1"]) is None  # and nothing was written
