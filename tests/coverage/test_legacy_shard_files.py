@@ -265,7 +265,7 @@ def test_a_listing_withholds_only_the_answers_that_rest_on_an_archived_unchecked
     for entry in after["withheld"]:
         assert entry["error"] == "shard files not checked" and world["shard-1"] in entry["reason"], entry
     said = json.loads(err)
-    assert said["error"] == "shard files not checked" and said["withheld"] == len(after["withheld"])
+    assert said["error"] == "shard files not checked" and said["context"]["withheld"] == len(after["withheld"])
 
 
 def test_a_report_withholds_the_artifacts_that_rest_on_an_archived_unchecked_shard(world):
@@ -347,3 +347,29 @@ def test_check_gives_its_verdict_on_a_store_it_cannot_write_and_says_nothing_was
             os.chmod(path, mode)
     world.store = Store.open(world.path)
     assert world.store.shard_files_state(world["shard-1"]) is None  # and nothing was written
+
+
+def test_check_does_not_read_a_store_it_cannot_write_as_it_is_when_a_write_ahead_log_lies_beside_it(world):
+    """The audit of the fallback: an immutable read ignores a ``-wal`` file, and docs/store.md says
+    that file belongs to the store; a store in a folder the user cannot write with a log beside it
+    would be read without what the log holds. It is refused (the first open's error), not read."""
+    import os
+    import stat
+
+    world.store.close()
+    wal = world.folder / "evidence-wal-guard.db-wal"
+    wal.write_bytes(b"not empty")
+    guarded = world.folder / "evidence-wal-guard.db"
+    guarded.write_bytes(world.path.read_bytes())
+    saved = {path: stat.S_IMODE(os.stat(path).st_mode) for path in (world.folder, guarded)}
+    os.chmod(guarded, 0o444)
+    os.chmod(world.folder, 0o555)
+    try:
+        out, err = io.StringIO(), io.StringIO()
+        code = cli.main(["check", "--store", str(guarded)], stdout=out, stderr=err)
+        assert (code, out.getvalue()) == (errors.EXIT_REFUSED, ""), err.getvalue()
+        assert json.loads(err.getvalue())["error"] == "not a store"
+    finally:
+        for path, mode in saved.items():
+            os.chmod(path, mode)
+    world.store = Store.open(world.path)

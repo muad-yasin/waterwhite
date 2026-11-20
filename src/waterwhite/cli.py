@@ -482,7 +482,10 @@ def _open_for_check(args: argparse.Namespace) -> tuple[Store, bool]:
     try:
         return Store.open(path, migrate_older=False), True
     except (NotAStore, WriteRefused) as first:
-        for immutable in (False, True):  # a store with no -shm to open (a folder it cannot write) is read as it is
+        wal = Path(f"{path}-wal")
+        # A store with no -shm to open (a folder it cannot write) is read as it is, which ignores a
+        # write-ahead log: not when one with content lies beside the file (it belongs to the store).
+        for immutable in (False,) if wal.is_file() and wal.stat().st_size else (False, True):
             try:
                 return Store.open(path, readonly=True, immutable=immutable), False
             except WaterwhiteError:
@@ -1212,6 +1215,8 @@ def _unmet_conditions(made: dict, report: dict, *, sides_given: bool) -> list[st
     from .rebuild import verify_sides
 
     unmet = []
+    for name in verify_sides.report_withheld(report):
+        unmet.append(f"report withheld {name}: its answer rests on an archived shard no check has passed")
     kinds = {entry["artifact"]: entry["kind"] for entry in report["artifacts"]}
     has_files = v.KIND_JSONL in kinds.values()
     has_shards = v.KIND_SHARD in kinds.values()
@@ -1522,9 +1527,10 @@ def main(argv: Sequence[str] | None = None, *, stdout: TextIO | None = None,
     if withheld:
         # What was printed is all the tool can give; the command still does not exit 0 (the
         # fault's own code), and says so, as an error, on standard error.
-        said = {"error": ShardFilesNotChecked.name, "withheld": len(withheld),
+        said = {"error": ShardFilesNotChecked.name,
                 "detail": f"{len(withheld)} answer(s) rest on an archived shard no check has passed "
-                          "and are named in the output as withheld"}
+                          "and are named in the output as withheld",
+                "context": {"withheld": len(withheld)}}
         err.write(f"error: {said['error']}: {said['detail']}\n" if as_text else
                   json.dumps(said, ensure_ascii=False) + "\n")
         return ShardFilesNotChecked.exit_code

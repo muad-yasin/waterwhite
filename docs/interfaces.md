@@ -1497,7 +1497,7 @@ What `verify` reads of the report: `form`; `request`, which it puts again to the
 store (`source` is text, `members` and `records` lists of text); for each of `artifacts`,
 `artifact`, `instance`, `kind` and `action` (text) and `successor` (text or null), and,
 where a rewritten artifact's own count is the record of what it leaves, `rows_in_successor`
-and `documents_in_successor`; `counts.records.unresolved`; and the shards named under
+and `documents_in_successor`; `counts.records.unresolved`; the artifacts named in `withheld` (a report that carries any is never held by `--require-held`); and the shards named under
 `groups.placements.*.landing[].shard`. A report whose `form` is another, that lacks one of
 these, or that gives one as something it is not (a number where text is read, an object
 where a list is) is refused ("request refused"). A report or a sides file that cannot be read is

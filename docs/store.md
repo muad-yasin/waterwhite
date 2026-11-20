@@ -77,7 +77,7 @@ store.close()                                          # or: with Store.open(...
   (`Store.recheck_shard_files`, the command `check`), written at registration for a shard registered by
   this version. A shard already stored has no row: a negative answer that rests on its map, with its
   files not at their place, is not given until the check has passed (`ShardFilesNotChecked`, exit 3).
-  `create` runs every step, so a new store
+  While a migration is under way, or was killed in a later step, `meta` also holds `migration_unsaid`, the versions of the committed steps whose note has not been given. `create` runs every step, so a new store
   and a migrated one hold the same schema. `open` runs the missing steps; a
   read-only open of a store that needs a step is refused (`Refused`), and so is the open
   of `check`, which writes a little and is not the command that migrates. A writable open

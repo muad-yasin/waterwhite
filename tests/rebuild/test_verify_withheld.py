@@ -10,7 +10,7 @@ import sqlite3
 
 from waterwhite.store import Store
 
-from rb_kit import hand_report, run, write_json
+from rb_kit import copy_shard, hand_report, run, sides_document, write_json, write_lines
 
 
 def archive_the_successor_shard(world) -> None:
@@ -39,3 +39,24 @@ def test_verify_withholds_the_successor_that_rests_on_an_archived_unchecked_shar
     assert (successor["registered"], successor["answer"], successor["answered"]) == (True, None, None)
     assert made["history"][0]["answer"] == "contains"  # what does not rest on the shard is printed
     assert json.loads(err)["error"] == "shard files not checked"
+
+
+def test_a_report_that_withholds_an_artifact_is_not_held_by_require_held(repair_world, tmp_path):
+    """The path from a withheld answer in the report to the verification: a report whose shard
+    entry is "unresolved" because its answer was withheld (it rests on an archived shard no check
+    has passed) names no unresolved record, so the verification's own gate could read it as
+    equal on both sides and hold. A report that carries withheld answers never holds."""
+    folder = repair_world.folder
+    report = hand_report(repair_world, [("R1", "keep", None), ("shard-3", "keep", None)])
+    report["withheld"] = [{"artifact": "shard-3", "instance": repair_world["shard-3"], "kind": "shard",
+                           "error": "shard files not checked", "shard": repair_world["shard-3"],
+                           "state": None, "reason": "the files of the shard are away"}]
+    for entry, name in zip(report["artifacts"], ("R1", "shard-3")):
+        entry["action"] = "keep" if name == "R1" else "unresolved"
+    write_lines(tmp_path / "repaired/R1.jsonl", [])
+    both = {"R1": str(folder / "R1.jsonl")}
+    code, out, err = run(repair_world, "verify", "--report", str(write_json(tmp_path / "report.json", report)),
+                         "--sides", str(write_json(tmp_path / "sides.json", sides_document(both, both))),
+                         "--require-held")
+    assert code == 5, (code, err)
+    assert any(line.startswith("report withheld shard-3") for line in json.loads(err)["unmet"]), err

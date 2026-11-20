@@ -497,7 +497,7 @@ shard reads as not checked, so that a negative answer resting on the map of a sh
 are not at their place is not given until `check` has read them. Step 5 also writes the segment
 of every trace row and indexes it (its time grows with the rows of the store's traces). Any other command that opens
 a store for writing and has to migrate it adds the same `"migrated"` entry to its output. The
-refusals are those of opening a store: "not a store", "store of a newer schema
+refusals are those of opening a store (a migration that is killed in a later step leaves the versions of the steps that committed in `meta`, as `migration_unsaid`, and the next run that finishes names them in its note; a process killed after the last step committed and before the note was printed loses the note; a library call that is told of nothing leaves no record): "not a store", "store of a newer schema
 version". A step can refuse a store it cannot bring forward: step 3 refuses one that
 holds two rows for one array of a segment's blend with "cache digest conflict" (exit 3,
 docs/store.md "Opening a store"), and the store is left as it was. Exit 0 when the
@@ -1035,7 +1035,7 @@ read-only and writes nothing. The JSON form is in `docs/interfaces.md` section 7
   its own.
 - The report is read for `form`, `request`, each artifact's `artifact`, `instance`,
   `kind`, `action` and `successor` (null allowed), `rows_in_successor` and
-  `documents_in_successor` of a rewritten artifact, the shards under
+  `documents_in_successor` of a rewritten artifact, the artifacts named in `withheld` (a report that carries any never holds), the shards under
   `groups.placements.*.landing[].shard`, and `counts.records.unresolved`; a
   report without one of these is refused, and so is one that gives a field that is read
   as something it is not (`artifact`, `instance`, `kind` and `action` are text, `successor`

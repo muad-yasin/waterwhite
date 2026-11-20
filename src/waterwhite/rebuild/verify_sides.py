@@ -173,6 +173,21 @@ def require_instances_held(store, artifacts: list[dict]) -> None:
                   artifact=entry["artifact"])
 
 
+def report_withheld(report: Mapping) -> list[str]:
+    """The artifacts a report names as withheld (``withheld``, present only when an answer rests on an
+    archived shard no check has passed). A report that carries any is never held by the
+    verification's gate: what it says of those artifacts was not judged."""
+    held = report.get("withheld")
+    _need(held is None or isinstance(held, list), "the report's withheld is not a list")
+    names = []
+    for entry in held or []:
+        _need(isinstance(entry, Mapping) and isinstance(entry.get("artifact"), str),
+              "an entry of the report's withheld names no artifact")
+        _clean(entry["artifact"], "the artifact of an entry of the report's withheld")
+        names.append(entry["artifact"])
+    return names
+
+
 def report_unresolved(report: Mapping) -> int:
     counts = report.get("counts")
     records = counts.get("records") if isinstance(counts, Mapping) else None
@@ -438,6 +453,7 @@ def verify(store, report: Mapping, *, sides: Mapping | None = None, base=None,
         _need(isinstance(sides, Mapping), "the sides file is not a document")
         _check_sides_paths(sides)
     artifacts = report_artifacts(report)
+    report_withheld(report)
     unresolved = report_unresolved(report)
     request = report_request(store, report)
     require_instances_held(store, artifacts)

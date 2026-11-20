@@ -144,10 +144,11 @@ def migrate(conn: sqlite3.Connection, current: int, on_step=None) -> int:
         conn.execute("BEGIN IMMEDIATE")
         try:
             apply_step(conn, version)
-            conn.execute(
-                "INSERT INTO meta (key, value) VALUES (?, ?) "
-                "ON CONFLICT (key) DO UPDATE SET value = value || ',' || excluded.value",
-                (PENDING_KEY, str(version)))
+            if on_step is not None:  # a migration nobody is told of (a library call) leaves no record
+                conn.execute(
+                    "INSERT INTO meta (key, value) VALUES (?, ?) "
+                    "ON CONFLICT (key) DO UPDATE SET value = value || ',' || excluded.value",
+                    (PENDING_KEY, str(version)))
         except BaseException as error:
             conn.execute("ROLLBACK")
             if isinstance(error, sqlite3.Error):
@@ -160,7 +161,7 @@ def migrate(conn: sqlite3.Connection, current: int, on_step=None) -> int:
         ran += 1
         if on_step is not None:
             on_step(version)
-    if pending_steps(conn):
+    if on_step is not None and pending_steps(conn):
         conn.execute("BEGIN IMMEDIATE")
         conn.execute("DELETE FROM meta WHERE key = ?", (PENDING_KEY,))
         conn.execute("COMMIT")
