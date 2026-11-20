@@ -1,0 +1,47 @@
+# Runs on a clean checkout: builds the wheel, installs it into a fresh environment, runs the quickstart
+# of docs/quickstart.md against the installed package, then runs the tests that the declared markers
+# select. No secrets, no write permission. The Megatron environment (WATERWHITE_MEGATRON_ENV) is not
+# set, so the tests marked `megatron` are deselected by tests/conftest.py, which says how many; the
+# tests that need bubblewrap skip with their own reasons where a runner cannot make user namespaces.
+# The two actions are pinned to the commits of their releases v7.0.1 and v7.1.0 (release pages read 20 Nov 2026).
+name: tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.14"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Build the wheel
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build --wheel --outdir dist
+      - name: Install the wheel and the test dependencies into a fresh environment
+        run: |
+          python -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/python" -m pip install dist/*.whl pytest
+      - name: The tests import the installed package, and the quickstart runs against it
+        env:
+          WATERWHITE_EXPECT_INSTALLED: "1"
+        run: |
+          "$RUNNER_TEMP/venv/bin/python" -m pytest -o pythonpath=. -q -p no:cacheprovider tests/docs/test_quickstart_example.py -rs
+      - name: The tests the declared markers select
+        env:
+          WATERWHITE_EXPECT_INSTALLED: "1"
+        run: |
+          "$RUNNER_TEMP/venv/bin/python" -m pytest -o pythonpath=. -q -p no:cacheprovider -m "not slow" -rfEs tests

@@ -23,9 +23,15 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[2]
 PAGE = ROOT / "docs" / "quickstart.md"
 SRC = str(ROOT / "src")
+# With WATERWHITE_EXPECT_INSTALLED set the example runs against the INSTALLED package (the built wheel in a
+# fresh environment): the source tree is not put on the children's path, and a test below says which copy
+# of the package the tests imported. The CI workflow sets it (.github/workflows/tests.yml).
+EXPECT_INSTALLED = os.environ.get("WATERWHITE_EXPECT_INSTALLED")
 
 # The commands of docs/cli.md, one heading each.
 COMMANDS = {"init", "query", "show", "check", "migrate", "register-run", "replay", "recover", "report",
@@ -92,6 +98,8 @@ def test_the_commands_of_the_page_give_the_results_the_page_states(tmp_path):
     runs.mkdir()
     (work / SCRIPT_NAME).write_text(script(text), encoding="utf-8")
     env = dict(os.environ, PYTHONPATH=SRC)
+    if EXPECT_INSTALLED:
+        env.pop("PYTHONPATH")  # the children import the installed package, from wherever they run
 
     compared = 0
     for number, (command, stated) in enumerate(steps(text), start=1):
@@ -107,3 +115,17 @@ def test_the_commands_of_the_page_give_the_results_the_page_states(tmp_path):
             compared += 1
     assert compared == 3  # check and the two queries
     assert (work / "evidence.db").is_file()
+
+
+@pytest.mark.skipif(not EXPECT_INSTALLED, reason="WATERWHITE_EXPECT_INSTALLED is not set: the tests run against the source tree")
+def test_the_package_the_tests_import_is_the_installed_one():
+    """Where the run is meant to be against the installed wheel, the package the tests import is not the
+    one in the source tree (pytest's ``pythonpath`` puts ``src`` first unless it is overridden with
+    ``-o pythonpath=.``), and the wheel carries the store's schema files."""
+    import waterwhite
+    from waterwhite.store import store as store_module
+
+    where = Path(waterwhite.__file__).resolve()
+    assert ROOT / "src" not in where.parents, f"the tests imported the source tree: {where}"
+    assert list(Path(store_module.__file__).resolve().parent.glob("*.sql")), "the installed package holds no schema files"
+
