@@ -79,8 +79,9 @@ store.close()                                          # or: with Store.open(...
   files not at their place, is not given until the check has passed (`ShardFilesNotChecked`, exit 3).
   `create` runs every step, so a new store
   and a migrated one hold the same schema. `open` runs the missing steps; a
-  read-only open of a store that needs a step is refused (`Refused`). A writable open
-  migrates, and a command that does so says so in its output (`"migrated"`, with a sentence
+  read-only open of a store that needs a step is refused (`Refused`), and so is the open
+  of `check`, which writes a little and is not the command that migrates. A writable open
+  of any other command migrates, and a command that does so says so in its output (`"migrated"`, with a sentence
   that clean answers past a generation step now read "may contain" until the texts are shown).
 - A migration step can refuse a store. Step 3 does when a segment holds more than
   one row for one array of its blend, whether the digests differ or not: no write of
@@ -837,11 +838,15 @@ The proof reads these and answers from them. `check_integrity` does not raise:
   store was moved without it): the artifact check has nothing to compare, the
   records stay and still answer, and `missing_files` lists the artifact so that an
   answer can say so. A team that needs a gone file to stop a query would get that
-  as a setting; it is not the default. For a gone file the declared count is
+  as a setting; it is not the default. The exception is a shard (schema 5, DECISIONS.md D-181):
+  a negative answer that rests on the map of a shard whose files are not at their place, and
+  which no check of its files has passed (a shard of a store made before schema 5, or one
+  whose check failed), is not given: it stops with "shard files not checked", because the
+  offsets in the index of the shard cannot be looked at while the files are away; For a gone file the declared count is
   compared with the store's rows only, and check 8 does not look at it. Rows
   removed from the store together with a lowered count are then not found, for as
   long as the file is away: nothing is left to count them against. A negative
-  answer names such a file in its
+  answer that is given names such a file in its
   scope (`files_not_checked`), `check` names it in `missing_files`, and the count
   fault is raised as soon as the file is back at its recorded place.
 

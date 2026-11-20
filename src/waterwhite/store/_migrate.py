@@ -23,7 +23,7 @@ from __future__ import annotations
 import sqlite3
 from importlib import resources
 
-from ..errors import CacheDigestConflict
+from ..errors import CacheDigestConflict, WriteRefused
 
 SCHEMA_VERSION = 5
 
@@ -114,17 +114,27 @@ def apply_step(conn: sqlite3.Connection, version: int) -> None:
     )
 
 
-def migrate(conn: sqlite3.Connection, current: int) -> int:
+def migrate(conn: sqlite3.Connection, current: int, on_step=None) -> int:
     """Bring a store from ``current`` to ``SCHEMA_VERSION``, one transaction per
-    step. Returns the number of steps run."""
+    step. Returns the number of steps run. ``on_step(version)`` is called after each step
+    commits. A step that stops with a database error is rolled back and refused as a write
+    that did not happen (``WriteRefused``), naming the step and the version the store is
+    left at; a step that refuses the store (``CacheDigestConflict``) raises its own error."""
     ran = 0
     for version in range(current + 1, SCHEMA_VERSION + 1):
         conn.execute("BEGIN IMMEDIATE")
         try:
             apply_step(conn, version)
-        except BaseException:
+        except BaseException as error:
             conn.execute("ROLLBACK")
+            if isinstance(error, sqlite3.Error):
+                raise WriteRefused(
+                    f"the migration step {version} stopped: {error}; the store is left at "
+                    f"version {version - 1} and the command can be run again",
+                    step=version, left_at=version - 1) from error
             raise
         conn.execute("COMMIT")
         ran += 1
+        if on_step is not None:
+            on_step(version)
     return ran

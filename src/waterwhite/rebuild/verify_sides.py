@@ -78,6 +78,7 @@ def report_artifacts(report: Mapping) -> list[dict]:
     entries = report.get("artifacts")
     _need(isinstance(entries, list), "the report holds no list of artifacts")
     named: set[str] = set()
+    instances: set[str] = set()
     for entry in entries:
         _need(isinstance(entry, Mapping), "an entry of the report's artifacts is not an object")
         for key in ("artifact", "instance", "kind", "action", "successor"):
@@ -95,7 +96,12 @@ def report_artifacts(report: Mapping) -> list[dict]:
         _need(entry["artifact"] not in named,
               f"the report names {entry['artifact']} twice; an artifact has one entry",
               artifact=entry["artifact"])
+        _need(entry["instance"] not in instances,
+              f"the report gives the instance of {entry['artifact']} to two entries; an artifact "
+              "has one entry, whatever it is called",
+              artifact=entry["artifact"])
         named.add(entry["artifact"])
+        instances.add(entry["instance"])
     return [dict(entry) for entry in entries]
 
 
@@ -131,10 +137,15 @@ def require_instances_held(store, artifacts: list[dict]) -> None:
         # entry is compared only through its name, so a name of another artifact would let
         # that artifact's file stand for this one.
         if entry["action"] != v.ACTION_REWRITE:
-            resolved = store.artifact(entry["artifact"])
-            _need(resolved is not None and resolved.instance_id == entry["instance"],
-                  f"the report names {entry['artifact']} with the instance of another artifact; "
-                  "an entry's name is the name the store holds its instance under",
+            # By name: the store also resolves an instance id as a name, and an entry that
+            # names its artifact by the instance id is a second name for it. An artifact with
+            # no name is shown by its instance id (``rebuild.artifacts.shown``).
+            held_artifact = store.artifact(entry["instance"])
+            _need(entry["artifact"] in held_artifact.names
+                  or (not held_artifact.names and entry["artifact"] == entry["instance"]),
+                  f"the report names {entry['artifact']} with the instance of another artifact, or "
+                  "by something that is not a name the store holds it under; an entry's name is "
+                  "the name the store holds its instance under",
                   artifact=entry["artifact"])
 
 

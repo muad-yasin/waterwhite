@@ -225,6 +225,8 @@ def _index_from(take, size: int, where: str) -> ShardIndex:
             f"index file holds {size} bytes, its header needs {needed}: {where}"
         )
     lengths = _array(take(4 * sequences), "<i4", sequences, where)
+    if sequences and int(lengths.min()) < 0:
+        raise UnsupportedFormat(f"the index holds a sequence of negative length: {where}")
     offsets = _array(take(8 * sequences), "<i8", sequences, where)
     _check_offsets(lengths, offsets, code, where)
     documents = _array(take(8 * entries), "<i8", entries, where)

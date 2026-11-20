@@ -478,12 +478,21 @@ def _check(args: argparse.Namespace) -> tuple[dict, str]:
     with Store.open(_store_path(args), migrate_older=False) as store:
         store.recheck_shard_files()
         store.check_integrity(None)
+        files = {"present": "present", "absent": "away", "partial": "partial"}
         out = {
             "check": "passed",
             "artifacts": sum(1 for _ in store.artifacts()),
             "missing_files": [
                 {"instance": m.instance_id, "kind": m.kind, "path": m.path, "state": m.state}
                 for m in store.missing_files()
+            ],
+            # the shards a negative answer waits for: none was checked, or the check failed
+            "shards_not_passed": [
+                {"instance": shard.instance_id, "name": shard.names[0] if shard.names else shard.instance_id,
+                 "state": store.shard_files_state(shard.instance_id) or "unchecked",
+                 "files": files.get(store.file_state(shard.instance_id), "none")}
+                for shard in store.artifacts(v.KIND_SHARD)
+                if store.shard_files_state(shard.instance_id) != "passed"
             ],
         }
     return out, _plain(out)
@@ -1450,14 +1459,14 @@ def main(argv: Sequence[str] | None = None, *, stdout: TextIO | None = None,
         finally:
             Store.migration_hook = None
         if migrated and isinstance(value, dict):
-            found, reached = migrated[0]
+            found, reached = migrated[0][0], migrated[-1][1]
             note = migration_note(found, reached)
             value = {**value, "migrated": {"from": found, "to": reached, "note": note}}
             text = f"{text}\n{note}"
         printed = text if as_text else json.dumps(value, indent=2, ensure_ascii=False)
     except WaterwhiteError as error:
         # A store that was migrated before the command was refused stays migrated: say so here too.
-        note = migration_note(migrated[0][0], migrated[0][1]) if migrated else None
+        note = migration_note(migrated[0][0], migrated[-1][1]) if migrated else None
         if as_text:
             err.write(f"error: {error.name}" + (f": {error.detail}" if error.detail else "") + "\n")
             if note:
@@ -1465,7 +1474,7 @@ def main(argv: Sequence[str] | None = None, *, stdout: TextIO | None = None,
         else:
             payload = error.to_json()
             if note:
-                payload = {**payload, "migrated": {"from": migrated[0][0], "to": migrated[0][1], "note": note}}
+                payload = {**payload, "migrated": {"from": migrated[0][0], "to": migrated[-1][1], "note": note}}
             err.write(json.dumps(payload, ensure_ascii=False, default=str) + "\n")
         return error.exit_code
     out.write(printed + "\n")

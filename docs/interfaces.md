@@ -972,7 +972,7 @@ describes every command, flag and output in full.
 | `show <artifact> [--record LOCATOR]` | what the store holds about an artifact or one record of it; runs no loud check | 0; 1; 2; 3 |
 | `show <shard> --map NAMESPACE/DERIVATION [--verification RESULT]` | the rows of one named map of a shard; runs no loud check | 0; 1; 2; 3 |
 | `show <segment> --trace [--step N]` | the rows the join wrote for a registered run segment, in reading order, with its route, cause, the run record's launches (`launches`, as registered) and untraced steps; for a cyclic segment each step also names the epochs it reads in (`epochs`); `--step` keeps one step; runs no loud check | 0; 1; 2; 3 |
-| `check` | run the loud checks over the whole store | 0; 1; 2; 3 |
+| `check` | run the loud checks over the whole store, after reading the two files of every shard at its place and recording what the read found (it opens the store for writing, and refuses a store that needs a migration step) | 0; 1; 2; 3; 4 |
 | `report withdraw <source> [--member M ...] [--record ARTIFACT:LOCATOR ...] [--selector KEY=VALUE ...] [--layout NAME=PREFIX ...]` | the rebuild report of a withdrawal (plan 4.1, 4.3): per affected artifact and per record its action and its reason, the counts, the restart points, the checkpoints that carry exposure and the checkpoints that answer "not covered"; computed from the store as it is, writes nothing (section 7.1) | 0; 1; 2; 3 |
 | `report ban <text>`, `report flagged <file>` | requests of two extensions that are off: refused with "extension off" | 1; 2 |
 | `verify --report FILE [--sides FILE] [--mode seeded\|unseeded] [--text-field FIELD]` | the verification of a repair (plan 4.2, 4.4): the repaired side against the reference side, the artifacts the report keeps, the answers for the successors and for the history, the stale caches and the exact-rerun restart; opens the store read-only (sections 7.2 and 7.3) | 0; 1; 2; 3 |
@@ -985,8 +985,8 @@ describes every command, flag and output in full.
 | `recover map <shard> --input ARTIFACT --mode position\|token-matching\|both --append-eod yes\|no --eod-in-span yes\|no [--tokenizer-command CMD \| --tokenizer-entry MODULE:FUNCTION] [--sanitizer-log FILE]` | the tokenization map of a registered shard | 0; 1; 2; 3; 4 |
 
 Every command but `replay` takes `--store FILE`, and every command takes `--format json|text`. A store path that
-holds no store is "not a store" (exit 2) for `query`, `show`, `check`, `report` and `verify`, which
-open the store read-only, and for `recover`, which opens it for writing, or
+holds no store is "not a store" (exit 2) for `query`, `show`, `report` and `verify`, which
+open the store read-only, and for `check` and `recover`, which open it for writing, or
 read-only with `--dry-run` (every `recover` command takes it, prints its result
 and writes nothing). A recovery whose links did not verify still exits with 0:
 the result says what was found. The tokenizer a map recovery needs is the
@@ -1492,11 +1492,14 @@ claim (plan 4.2); `--text-field` is the field of a JSONL line that holds its tex
 (default `text`). The command opens the store read-only and writes nothing.
 
 What `verify` reads of the report: `form`; `request`, which it puts again to the
-store; for each of `artifacts`, `artifact`, `instance`, `kind`, `action` and
-`successor`; and `counts.records.unresolved`. A report whose `form` is another, or
-that lacks one of these, is refused ("request refused"). A report or a sides file that
-cannot be read is "usage". `verify` reads no other key: the report's `upstream_files`
-(section 7.1) is never read.
+store (`source` is text, `members` and `records` lists of text); for each of `artifacts`,
+`artifact`, `instance`, `kind` and `action` (text) and `successor` (text or null), and,
+where a rewritten artifact's own count is the record of what it leaves, `rows_in_successor`
+and `documents_in_successor`; `counts.records.unresolved`; and the shards named under
+`groups.placements.*.landing[].shard`. A report whose `form` is another, that lacks one of
+these, or that gives one as something it is not (a number where text is read, an object
+where a list is) is refused ("request refused"). A report or a sides file that cannot be read is
+"usage". Of the report, `verify` reads no other key: `upstream_files` (section 7.1) is never read.
 
 `verify` never certifies a repair for less than the report is about. It is not keyed on
 which store file it is handed (the report is printed from one store and checked on a
@@ -1506,7 +1509,9 @@ of the report is put to the store again, with the members and records it lists, 
 member or a record of the report that the store no longer holds ends in "member not
 registered" or "record not in source", and the scope the store expands to is never
 narrower than the report's; and an artifact entry whose `instance` the store does not
-hold ends in "request refused", naming the artifact. A faithful copy of the store, with
+hold, a report that names one artifact (by name, or by an instance) in two entries, and an
+entry, other than a rewritten artifact's, that is not named by a name the store holds its
+instance under end in "request refused", naming the artifact. A faithful copy of the store, with
 the successors registered, holds every instance of the report and is certified.
 
 ```json
@@ -1638,8 +1643,10 @@ the successors registered, holds every instance of the report and is certified.
   the digest the successor is registered with (null without `--sides`): an answer
   about another file says nothing about the one that was compared. It is also null for
   a successor that is not a file or shard, such as a mixture registered under the name
-  of a shard's successor: `verify --require-held` does not hold for it (docs/cli.md,
-  "Gating on the verification").
+  of a shard's successor, and for a file or shard of the other kind than the artifact it
+  replaces (the file the side names is of the replaced artifact's kind and is not read as
+  the other's): `verify --require-held` does not hold for it (docs/cli.md, "Gating on the
+  verification").
 - `history` has one entry for every artifact the report rewrites: the historical
   artifact still answers "contains" for the withdrawn source, because history keeps
   its attribution, and `instance_unchanged` is true when its instance id is the one

@@ -160,7 +160,9 @@ visited;
 its recorded place. For these no file was read: their declared digest was
 compared with the registered one only, and their declared count with the store's
 rows only, so records removed from the store together with a lowered count are
-not found while the file is away (docs/store.md, "States that are not faults"). A
+not found while the file is away (docs/store.md, "States that are not faults"). A shard
+is the exception: a negative that rests on a shard whose files are away and that no check has
+passed is not given ("shard files not checked", exit 3; docs/cli.md "check"). A
 negative says nothing beyond its scope: not about content that arrived under
 another source (plan L12), and not about what a generating model carries (plan
 L11). While the generating-model switch is off the sentence stands as written; with the switch on, a

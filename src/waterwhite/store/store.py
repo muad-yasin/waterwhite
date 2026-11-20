@@ -548,9 +548,10 @@ class Store(IntegrityMixin):
                         f"the store has schema version {found} and must be migrated to "
                         f"{SCHEMA_VERSION} first (the command line: waterwhite migrate --store FILE)"
                     )
-                migrate(conn, found)
-                if cls.migration_hook is not None:
-                    cls.migration_hook(found, SCHEMA_VERSION)
+                hook = cls.migration_hook
+                # the hook is told of each step as it commits, so a migration that stops later
+                # still has said what the steps before it changed
+                migrate(conn, found, None if hook is None else (lambda reached: hook(reached - 1, reached)))
         except BaseException:
             conn.close()
             raise
@@ -1561,27 +1562,34 @@ class Store(IntegrityMixin):
         the registered one is the digest check's fault (``check_integrity``) and records
         nothing; a shard whose files are not at their place keeps what it had. A "failed"
         shard stays failed: the registered digest names these bytes, and these bytes are
-        not a shard of this layout. Returns how many shards each result was recorded for."""
+        not a shard of this layout.
+
+        Each pair is read once (``read_shard_once`` gives the digest and the verdict from
+        one read of each file), outside any write transaction, and only the shards whose
+        record changes are written, in one short transaction: a check that finds nothing new
+        writes nothing, so it neither holds the write lock while it hashes nor moves the
+        store under a query that is reading it in another process. Returns how many shards
+        each result was recorded for (the changed ones)."""
         self._require_writable()
+        found = []
+        for row in self._conn.execute(
+                "SELECT instance_id, path, content_digest FROM artifact "
+                "WHERE kind = ? AND path IS NOT NULL ORDER BY artifact_id", (v.KIND_SHARD,)
+        ).fetchall():
+            prefix = self._disk_path(row["path"])
+            if not all(file.is_file() for file in artifact_files.shard_paths(prefix)):
+                continue
+            on_disk = artifact_files.read_shard_once(prefix)
+            if on_disk.digest != row["content_digest"]:
+                continue
+            found.append((row["instance_id"], "passed" if on_disk.document_count is not None else "failed"))
+        changed = [(instance, state) for instance, state in found if self.shard_files_state(instance) != state]
         done = {"passed": 0, "failed": 0}
-        with self._transaction() as conn:
-            for row in conn.execute(
-                    "SELECT instance_id, path, content_digest FROM artifact "
-                    "WHERE kind = ? AND path IS NOT NULL ORDER BY artifact_id", (v.KIND_SHARD,)
-            ).fetchall():
-                prefix = self._disk_path(row["path"])
-                if not all(file.is_file() for file in artifact_files.shard_paths(prefix)):
-                    continue
-                if artifact_files.read_shard_once(prefix).digest != row["content_digest"]:
-                    continue
-                try:
-                    artifact_files.read_shard(prefix)
-                except UnsupportedFormat:
-                    state = "failed"
-                else:
-                    state = "passed"
-                self._mark_shard_files(conn, row["instance_id"], state)
-                done[state] += 1
+        if changed:
+            with self._transaction() as conn:
+                for instance, state in changed:
+                    self._mark_shard_files(conn, instance, state)
+                    done[state] += 1
         return done
 
     def write_map(

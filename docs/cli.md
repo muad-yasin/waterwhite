@@ -158,7 +158,7 @@ Withdraws a source and answers.
 Before it answers, the query runs the store's loud checks: over the ancestor
 closure of the artifact it asks about, or over the whole store for a listing. A
 fault exits with code 3 and prints no answer. A query about an artifact whose
-closure does not hold the fault still answers.
+closure does not hold the fault still answers; a listing is one answer to every artifact, and stops at the first fault.
 
 One answer:
 
@@ -246,7 +246,9 @@ cycle, and `report` and `verify` stop in the same way.
 
 A loud fault (exit 3) names one of "map count mismatch", "map digest mismatch",
 "edge parent missing", "trace sample count mismatch", "artifact digest mismatch",
-"stored digest mismatch", "locator domain mismatch", "cache digest conflict".
+"stored digest mismatch", "locator domain mismatch", "cache digest conflict", "shard files not checked" (a
+negative answer rests on a shard whose files are away and which no check has passed; see `check`). A listing, `report`
+and `verify` stop at the first answer that raises it, as at the first cycle.
 
 ## query ban, query flagged
 
@@ -456,23 +458,27 @@ sample count differs from its step's batch size, an artifact whose file no longe
 has the registered digest. The first fault found exits with code 3 and its name.
 
 With no fault it prints
-`{"check": "passed", "artifacts": <n>, "missing_files": [...]}`. `missing_files`
-lists artifacts whose file is not at its recorded place. That is a state, not a
+`{"check": "passed", "artifacts": <n>, "missing_files": [...], "shards_not_passed": [...]}`.
+`missing_files` lists artifacts whose file is not at its recorded place. That is a state, not a
 fault: the records still answer, and a negative answer names such files in its
 scope. The exception is a shard whose files are not at their place and which no check
 has passed (below): a negative answer that rests on its map is not given.
 
 `check` also reads the two files of every shard that is at its place and has its
-registered digest, and records for the shard what that read found (schema 5): "passed"
-when the pair is a shard of this layout, with the offsets and the `.bin` size its index
-gives (the reading Megatron and the token reader agree on), "failed" when it is not. It does
-so before the loud checks, so the record stays when a fault stops the command. A shard
-registered by this version has "passed" from its registration. A shard of a store made
-before schema 5 has no record until a check has read its files; a query whose negative
-answer rests on the map of such a shard, or of a shard that "failed", with its files not at
-their place, exits with 3 and the name "shard files not checked" and prints no answer. With
-the files at their place the query's loud checks read them as before. A shard that "failed" stays
-failed: the registered digest names those bytes.
+registered digest (each pair once, outside any write transaction), and records for the shard
+what that read found (schema 5): "passed" when the pair is a shard of this layout, with the
+offsets and the `.bin` size its index gives (the reading Megatron and the token reader agree
+on), "failed" when it is not. Only a record that changes is written, so a check that finds
+nothing new writes nothing; a store file that cannot be written ends in "write refused"
+(exit 4). It does so before the loud checks, so the record stays when a fault stops the
+command. A shard registered by this version has "passed" from its registration. A shard of a
+store made before schema 5 has no record until a check has read its files. `shards_not_passed`
+lists every shard whose record is not "passed", each with its `instance`, its `name`, its
+`state` ("unchecked" or "failed") and whether its `files` are "present", "away" or "partial":
+the shards a negative answer is waiting for. A query whose negative answer rests on the map
+of such a shard, with its files not at their place, exits with 3 and the name "shard files
+not checked" and prints no answer. With the files at their place the query's loud checks read
+them as before. A shard that "failed" stays failed: the registered digest names those bytes.
 
 ## migrate
 
@@ -482,8 +488,8 @@ waterwhite migrate --store FILE
 
 Brings a store made by an earlier build to this build's schema version, one step
 at a time, each step one transaction (plan 3.4; docs/store.md). Every other
-command that reads a store opens it read-only and refuses one that needs a step,
-naming this command. A store already at this version is left as it is. It prints
+command that reads a store opens it read-only, or, for `check`, for writing without migrating, and
+refuses one that needs a step, naming this command. A store already at this version is left as it is. It prints
 `{"schema_version_found": <n>, "schema_version": <m>, "steps_run": <m - n>}`, and, when it
 ran steps, `"migrated": {"from", "to", "note"}`: from version 4 on the note says that every
 stored harness log now reads as not compared, so that a clean answer past a generation step
@@ -1029,12 +1035,14 @@ read-only and writes nothing. The JSON form is in `docs/interfaces.md` section 7
   mixture that reads it is read as one the report leaves unresolved, with a reason of
   its own.
 - The report is read for `form`, `request`, each artifact's `artifact`, `instance`,
-  `kind`, `action` and `successor` (null allowed), and `counts.records.unresolved`; a
+  `kind`, `action` and `successor` (null allowed), `rows_in_successor` and
+  `documents_in_successor` of a rewritten artifact, the shards under
+  `groups.placements.*.landing[].shard`, and `counts.records.unresolved`; a
   report without one of these is refused, and so is one that gives a field that is read
   as something it is not (`artifact`, `instance`, `kind` and `action` are text, `successor`
   is text or null, the request's `members` and `records` are lists of text, `groups`,
   `groups.placements` and each placement's `landing` are an object, an object and a list).
-  Nothing else is read: `upstream_files` is not.
+  A landing item that is not an object, or a shard in it that is not text, is not read. Nothing else is read: `upstream_files` is not.
 - A report is certified only against a store that holds what it names: an artifact entry
   whose `instance` the store does not hold is refused, and so is a report that names one
   artifact in two entries, and an entry, other than a rewritten artifact's, whose name is
