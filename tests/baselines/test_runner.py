@@ -2154,6 +2154,16 @@ def test_the_start_line_names_the_subjects_the_step_cap_and_the_sha_of_each_iden
 
 # --- The documents of the part -----------------------------------------------------------------------------------
 
+EM_DASH = chr(0x2014)
+
+
+def _em_dash_in(text: str) -> list[str]:
+    """The em dash is the one mark kept out of the text of the decision entries from D-170 on and of the
+    baselines document. The mark of the src and loc tie is the plan's and the table's own text: it may stand whole."""
+    text = text.replace(need_attr("baselines.interfaces", "MARK_TIE"), "")
+    return [EM_DASH] if EM_DASH in text else []
+
+
 def test_the_decisions_file_holds_entries_from_170_each_with_its_four_parts():
     text = (REPO / "DECISIONS.md").read_text(encoding="utf-8")
     entries = {}
@@ -2166,6 +2176,7 @@ def test_the_decisions_file_holds_entries_from_170_each_with_its_four_parts():
         for label in ("Built", "Other option", "Result of the other option", "What would change it"):
             assert label in body, f"D-{number} has no {label!r}"
         assert "traced" in body.lower() or "inferred" in body.lower(), f"D-{number} says neither traced nor inferred"
+        assert _em_dash_in(body) == [], f"D-{number} holds an em dash"
 
 
 def test_the_document_of_the_baselines_names_the_command_the_options_and_the_files_of_a_run():
@@ -2175,6 +2186,7 @@ def test_the_document_of_the_baselines_names_the_command_the_options_and_the_fil
     for word in ("python -m baselines", "--subjects", "--step-cap", "steps.jsonl", "sha256sums.txt",
                  "compare.json", "identity.json"):
         assert word in text, word
+    assert _em_dash_in(text) == []
 
 
 # --- The frozen program: the sha256 supplied from the command line -----------------------------------------------
@@ -2320,6 +2332,7 @@ def test_the_document_of_the_baselines_names_the_program_sha_and_the_lock_wait_o
     text = path.read_text(encoding="utf-8")
     for word in ("--program-sha256", "--lock-wait-bound", "lock_wait_seconds"):
         assert word in text, word
+    assert _em_dash_in(text) == []
 
 
 def test_the_gate_hands_the_lock_keywords_on_to_the_starter_it_guards():
