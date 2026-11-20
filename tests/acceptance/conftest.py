@@ -26,6 +26,14 @@ def world(tmp_path_factory) -> World:
     return World(tmp_path_factory.mktemp("acceptance"))
 
 
+@pytest.fixture(autouse=True)
+def _stores_are_not_written(world):
+    """With WATERWHITE_ACCEPTANCE_GUARD set, the test that writes to a built store fails (see
+    acceptance_world.GUARD_VARIABLE)."""
+    yield
+    world.assert_stores_unchanged()
+
+
 @pytest.fixture(scope="session")
 def repairs(world) -> SetRepairs:
     """The generated sets built, repaired and verified through the commands, once each (Check 9)."""

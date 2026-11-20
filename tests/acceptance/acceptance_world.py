@@ -110,34 +110,41 @@ ROW_KEYS = ("record", "label", "token_start", "token_end", "parent", "candidates
 FIXTURE_SHARDS = "E/"
 
 
-# When this variable is set, every file of a built store and of its files is made read-only once its
-# set-up (the runs registered) is done, so that a row that writes to a store that other rows, or other
-# files of the same session, read fails where it writes instead of changing what they read. A row
-# that writes works on ``copy()``, which thaws what it copies. The variable is the one the runner of
-# a set sets when it puts several files into one session (so that the stores are built once).
-FREEZE_VARIABLE = "WATERWHITE_ACCEPTANCE_FREEZE"
+# When this variable is set, the world records, once a store's set-up (the runs registered) is done, the
+# size and the modification time of every file of the store and of the files it was built from, and
+# ``assert_stores_unchanged`` (called after each test by tests/acceptance/conftest.py) fails the test
+# after which one of them is not what it was recorded as. A row that writes to a store that other rows,
+# or other files of the same session, read then fails where it writes, instead of changing what they
+# read. A row that writes works on ``copy()``. The variable is for a run that puts several acceptance
+# files into one pytest session, which builds each store once. (The files cannot be made read-only: a
+# reader of a store in the write-ahead mode needs to write its ``-shm`` file and to see the main file
+# as it is.)
+GUARD_VARIABLE = "WATERWHITE_ACCEPTANCE_GUARD"
+_AUXILIARY = ("-wal", "-shm")
 
 
-def _files_under(*roots: Path):
+def signature(*roots: Path) -> dict[Path, tuple[int, int]]:
+    """(size, modification time) of every file under the folders, but the write-ahead log and the
+    shared-memory file that a reader of a store makes beside it."""
+    found = {}
     for root in roots:
         for path in Path(root).rglob("*"):
-            if path.is_file() and not path.is_symlink():
-                yield path
+            if path.is_file() and not path.is_symlink() and not path.name.endswith(_AUXILIARY):
+                stat = path.stat()
+                found[path] = (stat.st_size, stat.st_mtime_ns)
+    return found
 
 
-def freeze(built: CapturedFixture) -> None:
-    """Make the files of a built store read-only (folders stay writable: a reader of a store in the
-    write-ahead mode makes its ``-shm`` file beside it)."""
-    if not os.environ.get(FREEZE_VARIABLE):
-        return
-    for path in _files_under(built.store.parent, built.out):
-        path.chmod(path.stat().st_mode & ~0o222)
-
-
-def thaw(folder: Path) -> None:
-    """Undo ``freeze`` for a folder that was copied from frozen files."""
-    for path in _files_under(folder):
-        path.chmod(path.stat().st_mode | 0o200)
+def changed(was: dict[Path, tuple[int, int]]) -> list[Path]:
+    """The files of a recorded signature that are gone or are not what they were."""
+    now = {}
+    for path in was:
+        try:
+            stat = path.stat()
+        except OSError:
+            continue
+        now[path] = (stat.st_size, stat.st_mtime_ns)
+    return sorted(path for path, held in was.items() if now.get(path) != held)
 
 
 class WorldError(Exception):
@@ -160,6 +167,7 @@ class World:
         self._shown: dict[tuple[str, ...], Mapping] = {}
         self._lines: dict[Path, list[str]] = {}
         self._manifests: dict[Path, dict[str, int]] = {}
+        self._signatures: dict[str, dict[Path, tuple[int, int]]] = {}
         self._scratch = 0
         # The repairs of the stores of the table, and the documents the report and verify
         # printed for them (name, command line) -> the document or the failure.
@@ -195,6 +203,15 @@ class World:
                 raise
         return self._built[name]
 
+    def assert_stores_unchanged(self) -> None:
+        """Fail if a file of a store the world built, as recorded after its set-up, has been written
+        since (only with ``GUARD_VARIABLE`` set)."""
+        for name, was in self._signatures.items():
+            moved = changed(was)
+            if moved:
+                raise WorldError(f"a test wrote to the shared store {name!r}: {[str(p) for p in moved[:5]]}; "
+                                 "a row that writes works on copy(name, state)")
+
     def _build(self, name: str) -> CapturedFixture:
         if self.refused(name) is not None:
             raise Unavailable(f"not built yet: the store {name!r} of the table (the "
@@ -210,7 +227,7 @@ class World:
         built = replica_fixture.build_table_store(self.base / "stores" / name, name,
                                                   **arguments)
         self._register_runs(name, built)
-        freeze(built)
+        self._signatures[name] = signature(built.store.parent, built.out) if os.environ.get(GUARD_VARIABLE) else {}
         for registered in built.instances:
             try:
                 needs = table.artifact_needs(registered)
@@ -282,7 +299,6 @@ class World:
         built = self.store(name)
         folder = self.base / "copies" / f"{name}--{label}"
         shutil.copytree(built.store.parent, folder)
-        thaw(folder)  # a copy is where a row writes
         return dataclasses.replace(built, store=folder / built.store.name,
                                    out=folder / built.out.name)
 

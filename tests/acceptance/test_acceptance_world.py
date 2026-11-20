@@ -106,3 +106,27 @@ def test_the_manifest_of_a_release_is_read_once_however_many_candidate_entries_n
     assert found == []
     assert asked == [("show", "RS"[i % 2], "--record", f"L{i + 1 + (100 if i % 2 else 0)}") for i in range(40)]
     assert len(reads) == 2, f"the manifests were read {len(reads)} times for 40 entries of two releases"
+
+
+def test_the_guard_names_a_file_of_a_built_store_that_was_written_after_its_set_up(tmp_path):
+    """With several files in one session a store is built once and read by all of them; a row that
+    writes to it must fail where it writes. The signature is the size and the modification time of
+    each file; the files a reader makes beside a store in the write-ahead mode, and files made later,
+    are not part of it."""
+    store = tmp_path / "stores" / "main"
+    store.mkdir(parents=True)
+    (store / "store.sqlite").write_bytes(b"one")
+    (store / "manifest.jsonl").write_bytes(b"x")
+    was = acceptance_world.signature(store)
+    assert sorted(path.name for path in was) == ["manifest.jsonl", "store.sqlite"]
+    (store / "store.sqlite-shm").write_bytes(b"reader")
+    (store / "store.sqlite-wal").write_bytes(b"")
+    (store / "later.sqlite").write_bytes(b"made after the set-up")
+    assert acceptance_world.changed(was) == []
+    (store / "store.sqlite").write_bytes(b"two!")  # a write: another size
+    assert [path.name for path in acceptance_world.changed(was)] == ["store.sqlite"]
+    was = acceptance_world.signature(store)
+    (store / "manifest.jsonl").write_bytes(b"x")  # the same bytes rewritten: another modification time
+    assert [path.name for path in acceptance_world.changed(was)] == ["manifest.jsonl"]
+    (store / "manifest.jsonl").unlink()
+    assert [path.name for path in acceptance_world.changed(was)] == ["manifest.jsonl"]  # gone is changed
