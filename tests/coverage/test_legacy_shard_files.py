@@ -189,15 +189,16 @@ def test_check_says_which_shards_are_not_passed_and_whether_their_files_are_away
     assert code == 0 and json.loads(out)["shards_not_passed"] == []
 
 
-def test_check_lists_a_failed_shard_whose_files_are_away_and_one_whose_files_are_back_fails_the_check(world):
-    swap_the_offsets(world)
-    forget_checks(world)
-    code, out, err = cli_run(world, "check")  # present: the loud check stops, the record stays
-    assert code == errors.EXIT_INTEGRITY
+def test_check_lists_a_failed_shard_whose_files_are_away(world):
+    """A shard recorded "failed" (the record a check of swapped offsets makes, see above) and
+    whose files are away: the loud checks have nothing to read, so ``check`` passes, and the
+    list says which shard every negative through it is refused for."""
+    world.sql(("UPDATE shard_files_check SET state = 'failed' WHERE artifact_id = "
+               "(SELECT artifact_id FROM artifact WHERE instance_id = ?)", (world["shard-1"],)))
     put_away(world)
     code, out, err = cli_run(world, "check")
     said = json.loads(out)
-    assert code == 0
+    assert code == 0, err
     assert said["shards_not_passed"] == [{"instance": world["shard-1"], "name": "shard-1",
                                           "state": "failed", "files": "away"}]
 

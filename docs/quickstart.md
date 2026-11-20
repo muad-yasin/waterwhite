@@ -86,6 +86,7 @@ $ waterwhite check --store evidence.db --format text
 check: passed
 artifacts: 2
 missing_files: none
+shards_not_passed: none
 ```
 
 ## 4. Ask what a withdrawn record reaches

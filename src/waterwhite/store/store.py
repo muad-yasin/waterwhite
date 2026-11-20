@@ -560,10 +560,14 @@ class Store(IntegrityMixin):
     def close(self) -> None:
         """Close the store. A writable store first folds its write-ahead log into
         the file. That needs no other connection to be reading; when one is, the
-        log stays beside the file (``<file>-wal``) and nothing is lost."""
+        log stays beside the file (``<file>-wal``) and nothing is lost. A store this
+        connection wrote nothing to is closed without that fold: the fold moves the
+        file's data version for every other connection, so a command that only read
+        (``check`` on a store with nothing new to record) would end a query that is
+        reading the store in another process with "store written during the query"."""
         if self._closed:
             return
-        if not self._readonly:
+        if not self._readonly and self._conn.total_changes:
             try:
                 self._conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
             except sqlite3.OperationalError:
