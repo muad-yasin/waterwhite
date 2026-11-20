@@ -105,6 +105,14 @@ def require_instances_held(store, artifacts: list[dict]) -> None:
               f"the store does not hold the instance the report names for {entry['artifact']}; "
               "a repair is verified against the store the report was made for, or a copy of it",
               artifact=entry["artifact"])
+        # The kind the report states is the kind the store holds that instance as: the
+        # successor's kind is held against it, and a stated kind the store does not
+        # hold would let a successor of another kind stand for the artifact.
+        held = store.artifact(entry["instance"]).kind
+        _need(entry["kind"] == held,
+              f"the report names {entry['artifact']} as a {entry['kind']}, and the store "
+              f"holds that instance as a {held}",
+              artifact=entry["artifact"])
 
 
 def report_unresolved(report: Mapping) -> int:

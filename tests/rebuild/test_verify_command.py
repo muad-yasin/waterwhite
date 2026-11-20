@@ -113,7 +113,47 @@ def test_a_sides_path_that_is_not_text_is_refused_naming_the_side_and_the_artifa
             assert (error["context"]["side"], error["context"]["artifact"]) == (which, "R1")
 
 
+def test_a_report_whose_kind_is_not_the_stores_kind_of_that_instance_is_refused(repair_world, tmp_path):
+    """C&C's ruling on the F2 gate: the gate compares a successor's kind with the kind
+    the report states for the artifact it replaces. The report's instance id was held
+    against the store, its kind was not, so a report that stated another kind than the
+    store holds for that instance could pass ``--require-held``. It is refused."""
+    report, sides = files(repair_world, tmp_path)
+    held = json.loads(report.read_text(encoding="utf-8"))
+    assert held["artifacts"][0]["kind"] == "jsonl"
+    for lie in ("shard", "mixture", "checkpoint"):
+        broken = json.loads(json.dumps(held))
+        broken["artifacts"][0]["kind"] = lie
+        path = write_json(tmp_path / f"report-{lie}.json", broken)
+        code, out, err = run(repair_world, "verify", "--report", str(path), "--sides", str(sides),
+                             "--require-held")
+        error = error_of(err)
+        assert (code, out, error["error"]) == (2, "", "request refused"), (lie, err)
+        assert "R1" in error["detail"] and "jsonl" in error["detail"] and lie in error["detail"], error
+
+
+def test_a_report_that_calls_a_shard_a_mixture_does_not_let_a_mixture_stand_for_it(repair_world):
+    """The case the kind check exists for. Before it, a report that stated "mixture" for a
+    shard, with a mixture registered under the successor name and both sides naming the
+    shard, exited 0 under ``--require-held`` (checked on 36559fc, in both modes)."""
+    from rb_kit import copy_shard
+    folder = repair_world.folder
+    copy_shard(folder, "shards/shard-3", "sides/both/shard-3")
+    stated = hand_report(repair_world, [("shard-3", "rewrite", "successor of mix-2")])
+    stated["artifacts"][0]["kind"] = "mixture"
+    report = write_json(folder / "report.json", stated)
+    both = {"shard-3": str(folder / "sides/both/shard-3")}
+    sides = write_json(folder / "sides.json", sides_document(both, both))
+    for mode in ("seeded", "unseeded"):
+        code, out, err = run(repair_world, "verify", "--report", str(report), "--sides", str(sides),
+                             "--mode", mode, "--require-held")
+        error = error_of(err)
+        assert (code, out, error["error"]) == (2, "", "request refused"), (mode, err)
+        assert "names shard-3 as a mixture" in error["detail"] and "as a shard" in error["detail"], error
+
+
 def test_a_report_or_sides_file_that_cannot_be_read_is_a_usage_error(repair_world, tmp_path):
+
     report, sides = files(repair_world, tmp_path)
     code, out, err = run(repair_world, "verify", "--report", str(report))
     assert code == 0, err

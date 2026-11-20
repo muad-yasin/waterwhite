@@ -1804,7 +1804,8 @@ def verify(store, report: Mapping, *, sides: Mapping | None = None, base=None,
            mode: str = "unseeded", text_field: str = "text") -> dict: ...
     # the document of 7.3. `report` and `sides` are parsed documents; `base` is the
     # folder that relative paths of `sides` are taken from. Refused ("request refused")
-    # when the store does not hold the instance of an entry of the report's `artifacts`.
+    # when the store does not hold the instance of an entry of the report's `artifacts`,
+    # or holds it as another kind than the entry's `kind`.
     # With a sides file it also reads which shards each build wrote, from the store and from
     # the folder of the reference files (`shards_each_build_wrote`, 7.3), and not from the
     # list of names of the sides file. A shard the report names under a layout's landing is
