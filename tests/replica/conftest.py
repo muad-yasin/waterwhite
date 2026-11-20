@@ -207,6 +207,11 @@ def _megatron_stand_in(root: Path):
         patch.setattr(megatron_tokenizer, "tokenize_shards", tokenize_shards)
         patch.setattr(megatron_tokenizer, "line_tokenizer",
                       lambda env, settings, work_dir, timeout=120.0: ToyLineTokenizer())
+        # The replica's command line reads the environment from WATERWHITE_MEGATRON_ENV; for as
+        # long as the stand-in lasts it is the stand-in folder, so a test that runs a replica
+        # command under it needs no Megatron environment (and does not read the real one).
+        patch.setattr(megatron_tokenizer.MegatronEnv, "from_environment",
+                      classmethod(lambda cls, environ=None: cls(root)))
         yield megatron_tokenizer.MegatronEnv(root)
 
 

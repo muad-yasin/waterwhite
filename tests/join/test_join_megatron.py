@@ -19,8 +19,9 @@ finished pair, set ``WATERWHITE_JOIN_RUNS`` to the folder ``oracle/fixture_runs.
 wrote (its ``--out``); the run records in it name the fixture's shards by
 relative path, so the fixture folder must still lie where it was built.
 
-The tests fail, and are not skipped, when the Megatron environment is missing:
-leave them out with ``-m "not megatron"``.
+The tests fail, and are not skipped, when the Megatron environment is missing and the
+run selects them: a run that does not name the marker has them deselected by
+tests/conftest.py (and says so); ``-m "not megatron"`` leaves them out on purpose.
 """
 
 from __future__ import annotations

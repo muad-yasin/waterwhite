@@ -939,6 +939,25 @@ def test_the_work_path_the_guard_lets_through_is_the_longest_one_a_real_manager_
             check(over)
         assert caught.value.stage == "work-path"
         assert str(allowed + 1) in caught.value.reason and str(allowed) in caught.value.reason
+
+
+def test_a_real_manager_fails_one_character_over_the_work_path_bound():
+    """The other half of the bound: with the work folder one character over, the real manager
+    stops with "AF_UNIX path too long", as step 12 of the first pass did. That is a fact of the
+    interpreter the manager runs under: Python 3.14 starts its manager's socket at a short
+    path in /tmp, whatever TMPDIR is, so there the limit the guard names does not apply and the
+    manager starts. The test is skipped, naming that, where this interpreter's manager starts."""
+    allowed = _fn("WORK_PATH_LONGEST")
+    with _short_base() as base:
+        # Whether the limit applies to this interpreter is decided far over the bound (it fails
+        # there on Python 3.12 and starts on 3.14); only where it applies is the bound itself held
+        # to the manager, so a bound set too low is never hidden by the skip.
+        far = _work_of_length(base / "far", allowed + 60)
+        if _manager_outcome(far) == "started":
+            pytest.skip(f"Python {sys.version.split()[0]}: its multiprocessing manager started with the "
+                        f"work folder at {allowed + 60} characters, so the unix socket limit the guard "
+                        "names does not apply to this interpreter")
+        over = _work_of_length(base / "over", allowed + 1)
         assert "AF_UNIX path too long" in _manager_outcome(over)
 
 
@@ -2392,6 +2411,10 @@ def test_the_probe_is_a_step_behind_the_lock_too_with_its_own_note_and_bound(tmp
 LOCK_PREFIX_FLOCK = r'''
 lock=$1
 shift
+# The bound reaches the prefix as a float ("30.0") and flock reads it in the locale's number format:
+# under de_DE, flock -w 30.0 stops with "invalid timeout value" (docs/baselines.md, "The lock prefix").
+# The prefix pins the numeric format; the runner reads the acquire line with a decimal point.
+export LC_ALL=C
 bound=${WATERWHITE_LOCK_WAIT_BOUND:-60}
 export NOTE_FILE=${WATERWHITE_LOCK_NOTE:-/dev/null}
 begun=$(date +%s.%N)

@@ -198,7 +198,8 @@ def run_record(world, *, steps: tuple, batch: int, launches: list[dict],
 
 def drawn_order(epoch: int, rank: int) -> list[int]:
     """The whole order of one rank in one epoch, drawn as the cyclic sampler draws it."""
-    import torch  # run with the interpreter of the Megatron environment
+    # run with the interpreter of the Megatron environment; where torch is missing the test is skipped
+    torch = pytest.importorskip("torch")
 
     generator = torch.Generator()
     generator.manual_seed(epoch)

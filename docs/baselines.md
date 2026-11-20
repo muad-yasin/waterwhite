@@ -57,8 +57,13 @@ behind the lock prefix, which takes the lock for that one step and holds it only
 The runner makes a note file for the step in a folder of its own in the run record,
 `locks/<step id>/note.txt`, and sets two environment values on the prefix's process:
 `WATERWHITE_LOCK_NOTE` (that file) and `WATERWHITE_LOCK_WAIT_BOUND` (the bound, in seconds). The
-prefix writes one line, `acquired <seconds waited>`, to the note once it holds the lock, and then
+prefix writes one line, `acquired <seconds waited>`, to the note once it holds the lock (the seconds as
+digits with a decimal point, as `0.123`: the runner does not read a comma), and then
 starts the command. If the bound runs out first it starts nothing and exits with status 75.
+The runner hands the bound as a float (`7200.0`). A prefix that gives it to `flock -w` must make
+sure `flock` can read it: in a locale whose decimal separator is a comma, as `de_DE`, `flock -w
+7200.0` stops with "invalid timeout value", so such a prefix pins the numeric locale (`LC_ALL=C`)
+or rounds the bound to whole seconds.
 
 - The cap of a step counts from the acquire line and never before it: a wait longer than the cap
   is not a cap hit, and the seconds of a step do not hold the wait.

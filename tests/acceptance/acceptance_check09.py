@@ -225,7 +225,7 @@ WAITS: dict[str, tuple[tuple[str, str], ...]] = {
 # release rows only.
 TOKENIZED = frozenset({K_MULTISET, K_DIFFERENCE, K_DIGESTS, K_KEPT_SHARDS, K_ALL_REWRITE,
                        K_SUCCESSOR, K_ACTION, K_SHARDS_COUNTS, K_EXPOSURE_FREE, K_EXACT_RERUN,
-                       K_STALE})
+                       K_STALE, K_MIXTURES})
 
 def current_gaps() -> dict[str, bool]:
     """gate -> True where what the gate stands for does not exist yet. One source for both

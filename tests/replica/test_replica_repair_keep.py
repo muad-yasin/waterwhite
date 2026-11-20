@@ -26,7 +26,7 @@ import pytest
 from waterwhite import vocabulary as v
 from waterwhite.store.store import Store
 
-from replica import cli, megatron_tokenizer, repair
+from replica import cli, repair
 from replica.errors import InputError
 from replica.fixture import build_captured_fixture, default_spec_path
 
@@ -103,7 +103,7 @@ def partitioned(tmp_path_factory, megatron_stand_in):
 
 
 def test_a_shard_that_reads_the_word_is_built_and_registered_as_a_successor(
-        partitioned, tmp_path, megatron_stand_in, monkeypatch, capsys):
+        partitioned, tmp_path, megatron_stand_in, capsys):
     built, env = partitioned
     history = tmp_path / "history"
     shutil.copytree(built.out.parent, history)
@@ -114,9 +114,7 @@ def test_a_shard_that_reads_the_word_is_built_and_registered_as_a_successor(
         {"artifact": "E/shard-2", "kind": "shard", "action": "keep", "successor": None})),
         encoding="utf-8")
     out = tmp_path / "repaired"
-    with megatron_stand_in(tmp_path / "stand-in") as stand_in:
-        monkeypatch.setattr(megatron_tokenizer.MegatronEnv, "from_environment",
-                            classmethod(lambda cls, environ=None: stand_in))
+    with megatron_stand_in(tmp_path / "stand-in"):  # the stand-in is also the environment the command reads
         code, printed, err = run(
             ["repair", "--report", str(report), "--historical", str(history / built.out.name),
              "--out", str(out), "--store", str(store), "--spec", str(default_spec_path()),

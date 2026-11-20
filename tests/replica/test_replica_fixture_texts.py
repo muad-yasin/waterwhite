@@ -125,8 +125,9 @@ def test_x_p_and_t_are_short_in_tokens(repo, spec_doc, read_rows):
     snapshot folder of the Megatron environment that holds the spec's vocabulary
     file, plus one for the end-of-document token. Needs the environment and
     imports transformers, so it carries the ``megatron`` marker: on a shared
-    machine run it through the CPU lock. Without the environment it fails; it is
-    not skipped."""
+    machine run it through the CPU lock. Without the environment it fails when a
+    run selects it on purpose and is not skipped; a run that does not name the marker has
+    it deselected by tests/conftest.py."""
     env = os.environ.get("WATERWHITE_MEGATRON_ENV")
     assert env, "WATERWHITE_MEGATRON_ENV is not set: the token counts cannot be checked"
     vocab = Path(env) / spec_doc["tokenizer"]["vocab_file"]

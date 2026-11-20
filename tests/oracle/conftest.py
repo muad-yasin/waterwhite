@@ -6,8 +6,10 @@ says: GPT-2 BPE, ``--append-eod``, one partition, a fresh input folder per file,
 the tokenizer's files named so nothing is fetched, and the hub switched off.
 
 A test marked ``megatron`` fails, and is not skipped, when the environment is
-missing: a skipped oracle would let the checks that rest on it pass unseen. Leave
-them out with ``-m "not megatron"``.
+missing and the run selects it: a skipped oracle would let the checks that rest on
+it pass unseen. A run that does not name the marker has these tests deselected
+by tests/conftest.py, and says how many and why; ``-m "not megatron"`` leaves them
+out on purpose.
 """
 
 from __future__ import annotations

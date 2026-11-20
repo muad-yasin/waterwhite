@@ -971,7 +971,7 @@ script first, as the fixture spec sets it up: GPT-2 BPE, `--append-eod`, one
 worker, one partition, a fresh input folder per file. The stand-in built fixture
 of `test_oracle_fixture_runs.py` is made of those shards, laid out as a fixture
 build lays them out; it has the fixture's layout and not its texts. The tests
-fail, and are not skipped, when the environment is missing; leave them out with
+fail, and are not skipped, when the environment is missing and the run selects them (a run that does not name the marker has them deselected by `tests/conftest.py`, which says so); leave them out with
 `-m "not megatron"`. The script tests start several processes that each import
 Megatron and take about a minute together.
 
