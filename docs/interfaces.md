@@ -1491,7 +1491,7 @@ whether every step of the build was seeded and defaults to "unseeded", the weake
 claim (plan 4.2); `--text-field` is the field of a JSONL line that holds its text
 (default `text`). The command opens the store read-only and writes nothing.
 
-The listing, the report (7.1) and the verification (7.3) carry one more key, `withheld`, only when an answer rests on an archived shard no check has passed (docs/cli.md, "check"): a list of `{artifact, instance, kind, error, shard, state, reason}`; the artifact's entry in the report is "unresolved" with nothing judged, the successor's `answer` is null, and the command exits with 3 after printing.
+The listing, the report and the verification (the documents of this section and the next) carry one more key, `withheld`, only when an answer rests on an archived shard no check has passed (docs/cli.md, "check"): a list of `{artifact, instance, kind, error, shard, state, reason}`; the artifact's entry in the report is "unresolved" with nothing judged, the successor's `answer` is null, and the command exits with 3 after printing.
 
 What `verify` reads of the report: `form`; `request`, which it puts again to the
 store (`source` is text, `members` and `records` lists of text); for each of `artifacts`,
