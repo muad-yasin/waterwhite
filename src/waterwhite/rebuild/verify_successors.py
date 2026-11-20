@@ -43,12 +43,14 @@ def _holds_unresolved(store, session, instance_id: str) -> bool:
     return False
 
 
-def _matches_sides(held, name: str, sides: Mapping | None, base) -> bool | None:
+def _matches_sides(held, name: str, kind: str, sides: Mapping | None, base) -> bool | None:
     """Whether the file the repaired side names for the artifact has the digest the
     successor is registered with; null without a sides file, where the repaired side
-    names no file for it, and for an artifact with no file."""
+    names no file for it, for an artifact with no file, and for a successor that is not the
+    kind of artifact it replaces (``kind``, the report's): the file the side names is of the
+    replaced artifact's kind, and it is not read as the files of another (docs/cli.md)."""
     named = None if sides is None else (sides.get("repaired") or {}).get(name)
-    if named is None or held.kind not in (v.KIND_JSONL, v.KIND_SHARD):
+    if named is None or held.kind != kind or held.kind not in (v.KIND_JSONL, v.KIND_SHARD):
         return None
     return verify_sides.file_digest_of(held.kind, verify_sides.side_path(base, named)) == held.content_digest
 
@@ -77,7 +79,7 @@ def check_successors(store, report: Mapping, request, sides: Mapping | None, bas
                 "registered": True, "instance": held.instance_id,
                 "answer": answered.answer, "names": answered.names,
                 "holds_unresolved": _holds_unresolved(store, session, held.instance_id),
-                "matches_sides": _matches_sides(held, name, sides, base),
+                "matches_sides": _matches_sides(held, name, entry["kind"], sides, base),
                 "answered": answered.to_json(),
             })
         historical = store.resolve(name)

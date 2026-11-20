@@ -253,10 +253,24 @@ class ShardFiles:
     idx_digest: str
 
 
+def check_bin_size(index: ShardIndex, bin_path: Path) -> None:
+    """The ``.bin`` file is as long as its index says: the tokens of every sequence, each
+    the size of the index's token type. The token reader holds a shard to this, so the
+    registration and the integrity check hold it to the same size: a pair that the reader
+    refuses is no shard to register, to give a map or to answer a negative from."""
+    needed = int(index.token_starts()[-1]) * _ITEM_SIZES[index.dtype_code]
+    size = os.path.getsize(bin_path)
+    if size != needed:
+        raise UnsupportedFormat(
+            f"the .bin file holds {size} bytes and its index gives {needed}: {bin_path}"
+        )
+
+
 def read_shard(prefix: str | os.PathLike) -> ShardFiles:
     """Document count and content digest of the shard at ``prefix``."""
     bin_path, idx_path = shard_paths(prefix)
     index = read_shard_index(idx_path)
+    check_bin_size(index, bin_path)
     bin_digest = ids.file_digest(bin_path)
     idx_digest = ids.file_digest(idx_path)
     return ShardFiles(
@@ -289,13 +303,15 @@ class ShardOnDisk:
 def read_shard_once(prefix: str | os.PathLike) -> ShardOnDisk:
     """Content digest and document count of the shard at ``prefix``, each file read
     once: the index file is digested and read as an index in the same read. An
-    index that cannot be read as an index is not an error here; the digest still
-    says whether the pair is the registered one."""
+    index that cannot be read as an index, or whose ``.bin`` is not the size it gives, is
+    not an error here; the digest still says whether the pair is the registered one."""
     bin_path, idx_path = shard_paths(prefix)
     hasher = ids.ContentHasher()
     count, unreadable = None, None
     try:
-        count = read_shard_index(idx_path, hasher).document_count
+        index = read_shard_index(idx_path, hasher)
+        check_bin_size(index, bin_path)
+        count = index.document_count
     except UnsupportedFormat as exc:
         unreadable = exc.detail
     digest = ids.shard_digest(ids.file_digest(bin_path), hasher.hexdigest())
@@ -325,12 +341,7 @@ class ShardTokens:
                 f"leaves a document boundary with no sequence: {self.idx_path}"
             )
         self.starts = self.index.token_starts()
-        needed = int(self.starts[-1]) * self._dtype.itemsize
-        size = os.path.getsize(self.bin_path)
-        if size != needed:
-            raise UnsupportedFormat(
-                f"the .bin file holds {size} bytes and its index gives {needed}: {self.bin_path}"
-            )
+        check_bin_size(self.index, self.bin_path)
         self._file = None
 
     @property

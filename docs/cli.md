@@ -1013,9 +1013,16 @@ read-only and writes nothing. The JSON form is in `docs/interfaces.md` section 7
   its own.
 - The report is read for `form`, `request`, each artifact's `artifact`, `instance`,
   `kind`, `action` and `successor` (null allowed), and `counts.records.unresolved`; a
-  report without one of these is refused. Nothing else is read: `upstream_files` is not.
+  report without one of these is refused, and so is one that gives a field that is read
+  as something it is not (`artifact`, `instance`, `kind` and `action` are text, `successor`
+  is text or null, the request's `members` and `records` are lists of text, `groups`,
+  `groups.placements` and each placement's `landing` are an object, an object and a list).
+  Nothing else is read: `upstream_files` is not.
 - A report is certified only against a store that holds what it names: an artifact entry
-  whose `instance` the store does not hold is refused, and so is a request the store
+  whose `instance` the store does not hold is refused, and so is a report that names one
+  artifact in two entries, and an entry, other than a rewritten artifact's, whose name is
+  not the name the store holds its instance under (a rewritten artifact's is the `history`
+  entry's `instance_unchanged`), and so is a request the store
   no longer expands as the report lists it (a member or a record it no longer holds). A
   faithful copy of the store, with the successors registered, is certified.
 

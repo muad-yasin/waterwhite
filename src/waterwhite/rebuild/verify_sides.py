@@ -42,16 +42,15 @@ def read_document(path, form: str, what: str) -> dict:
         raise UsageError(f"the {what} is not JSON: {error}", path=str(path)) from None
     if not isinstance(document, dict) or document.get("form") != form:
         raise Refused(f"the {what} is not a document of the form {form}", path=str(path))
-    if form == v.FORM_SIDES:
-        _check_sides_paths(document, what, path)
     return document
 
 
-def _check_sides_paths(document: Mapping, what: str, path) -> None:
+def _check_sides_paths(document: Mapping) -> None:
     """Every value of the two sides is a path, so text (docs/interfaces.md 7.2). A value
-    that is not is refused here, once, naming the side and the artifact, before any
-    reader takes it for a path. A side that is neither null nor an object is refused later, where
-    the side is read ("the sides file's repaired is not an object")."""
+    that is not is refused, once, naming the side and the artifact, before any reader takes
+    it for a path. It is checked where ``verify`` reads the sides, so a parsed document
+    handed to the function is held to it as a file is. A side that is neither null nor an
+    object is refused where the side is read ("the sides file's repaired is not an object")."""
     for which in ("repaired", "reference"):
         side = document.get(which)
         if not isinstance(side, Mapping):
@@ -59,9 +58,9 @@ def _check_sides_paths(document: Mapping, what: str, path) -> None:
         for artifact, named in side.items():
             if not isinstance(named, str):
                 raise Refused(
-                    f"the {what} names {artifact} on its {which} side by something that is "
+                    f"the sides file names {artifact} on its {which} side by something that is "
                     f"not a path (text): {json.dumps(named)}",
-                    path=str(path), side=which, artifact=artifact)
+                    side=which, artifact=artifact)
 
 
 # --- The report, as far as verify reads it ---------------------------------------------
@@ -78,12 +77,25 @@ def report_artifacts(report: Mapping) -> list[dict]:
     _need(report.get("form") == v.FORM_REPORT, f"the report is not a document of the form {v.FORM_REPORT}")
     entries = report.get("artifacts")
     _need(isinstance(entries, list), "the report holds no list of artifacts")
+    named: set[str] = set()
     for entry in entries:
         _need(isinstance(entry, Mapping), "an entry of the report's artifacts is not an object")
         for key in ("artifact", "instance", "kind", "action", "successor"):
             _need(key in entry, f"an entry of the report's artifacts lacks {key}")
+        for key in ("artifact", "instance", "kind", "action"):
+            _need(isinstance(entry[key], str), f"an entry of the report's artifacts gives {key} "
+                  f"as something that is not text: {json.dumps(entry[key])}")
+        _need(entry["successor"] is None or isinstance(entry["successor"], str),
+              f"the report gives {entry['artifact']} a successor that is not text: "
+              f"{json.dumps(entry['successor'])}", artifact=entry["artifact"])
         _need(entry["action"] in _ARTIFACT_ACTIONS,
               f"the report gives {entry['artifact']} the action {entry['action']!r}")
+        # An entry is one entry for one artifact: the gate and the comparison are keyed by the
+        # name, so a name named twice lets the later entry stand in for the earlier.
+        _need(entry["artifact"] not in named,
+              f"the report names {entry['artifact']} twice; an artifact has one entry",
+              artifact=entry["artifact"])
+        named.add(entry["artifact"])
     return [dict(entry) for entry in entries]
 
 
@@ -113,6 +125,17 @@ def require_instances_held(store, artifacts: list[dict]) -> None:
               f"the report names {entry['artifact']} as a {entry['kind']}, and the store "
               f"holds that instance as a {held}",
               artifact=entry["artifact"])
+        # The name is the name of that instance. A rewritten artifact is the exception: its
+        # own check is the ``history`` entry, which says "instance changed" for a name the
+        # store now holds as another instance, and the gate does not hold on it. Every other
+        # entry is compared only through its name, so a name of another artifact would let
+        # that artifact's file stand for this one.
+        if entry["action"] != v.ACTION_REWRITE:
+            resolved = store.artifact(entry["artifact"])
+            _need(resolved is not None and resolved.instance_id == entry["instance"],
+                  f"the report names {entry['artifact']} with the instance of another artifact; "
+                  "an entry's name is the name the store holds its instance under",
+                  artifact=entry["artifact"])
 
 
 def report_unresolved(report: Mapping) -> int:
@@ -131,6 +154,11 @@ def report_request(store, report: Mapping):
           "the report holds no request that names a source")
     _need(held.get("kind", requests.KIND_WITHDRAW) == requests.KIND_WITHDRAW,
           "the report is for a request this build does not answer")
+    for key in ("members", "records"):
+        listed = held.get(key)
+        _need(listed is None or (isinstance(listed, list) and all(isinstance(n, str) for n in listed)),
+              f"the report's request gives {key} as something that is not a list of text: "
+              f"{json.dumps(listed)}")
     return requests.withdraw(
         store, held["source"], members=held.get("members") or (), records=held.get("records") or ())
 
@@ -273,10 +301,17 @@ def report_landing(report: Mapping, artifacts: list[dict]) -> list[str]:
     report names them, so a comparison of both builds reads them as it reads a shard of
     the report (D-148)."""
     held = {entry["artifact"] for entry in artifacts}
-    placements = (report.get("groups") or {}).get("placements") or {}
+    groups = report.get("groups")
+    _need(groups is None or isinstance(groups, Mapping), "the report's groups is not an object")
+    placements = (groups or {}).get("placements")
+    _need(placements is None or isinstance(placements, Mapping),
+          "the report's groups.placements is not an object")
     names: list[str] = []
-    for section in placements.values():
-        for item in (section.get("landing") or []) if isinstance(section, Mapping) else []:
+    for section in (placements or {}).values():
+        landing = section.get("landing") if isinstance(section, Mapping) else None
+        _need(landing is None or isinstance(landing, list),
+              "a placement of the report holds a landing that is not a list")
+        for item in landing or []:
             shard = item.get("shard") if isinstance(item, Mapping) else None
             if isinstance(shard, str) and shard and shard not in held and shard not in names:
                 names.append(shard)
@@ -361,6 +396,9 @@ def verify(store, report: Mapping, *, sides: Mapping | None = None, base=None,
     extensions.check_switches(store.settings())  # before the mode, the report's shape or its request kind is looked at (D-CORE-6)
     if mode not in v.BUILD_MODES:
         raise UsageError(f"--mode is one of {', '.join(v.BUILD_MODES)}; got {mode!r}")
+    if sides is not None:
+        _need(isinstance(sides, Mapping), "the sides file is not a document")
+        _check_sides_paths(sides)
     artifacts = report_artifacts(report)
     unresolved = report_unresolved(report)
     request = report_request(store, report)
