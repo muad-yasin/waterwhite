@@ -865,7 +865,7 @@ def test_a_generation_parent_outside_the_hand_off_is_refused(world):
 
 
 def test_a_generation_edge_that_leaves_out_a_handed_record_is_refused(world):
-    """Sol's review of a011cd5, finding 1: every record the job was handed is an input
+    """The outside review of a011cd5, finding 1: every record the job was handed is an input
     of its edge (used, or in scope only); an edge that omits one would let the proof
     reach "does not contain" for a source whose record the job was handed."""
     a1, a2 = world.ref(world.A, 1), world.ref(world.A, 2)

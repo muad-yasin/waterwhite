@@ -199,7 +199,7 @@ def test_an_input_outside_the_hand_off_denies_the_bound(world, ask):
 
 
 def test_a_handed_record_the_edge_leaves_out_denies_the_bound(world, ask):
-    """Sol's review of a011cd5, finding 1: a job was handed two records of Z and its log
+    """The outside review of a011cd5, finding 1: a job was handed two records of Z and its log
     reads one; the edge lists both. Then the row of the second input leaves the edge (a
     store edited from outside, which the write would have refused). The stored log still
     holds the record, so the bound is not established and no "does not contain" may rest

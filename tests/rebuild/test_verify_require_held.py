@@ -209,7 +209,7 @@ def test_a_report_that_names_a_shard_and_no_sides_file_never_holds(repair_world,
 
 
 def test_a_successor_of_another_kind_than_the_artifact_it_replaces_never_holds(repair_world):
-    """Sol's review of a011cd5, finding 2: the report rewrites a shard, a clean mixture is
+    """The outside review of a011cd5, finding 2: the report rewrites a shard, a clean mixture is
     registered under the expected successor name, and both sides name the original shard.
     A mixture has no file to compare, so ``matches_sides`` is null and nothing said the
     successor is the wrong kind of artifact: the gate held and the exit code was 0."""
@@ -225,5 +225,23 @@ def test_a_successor_of_another_kind_than_the_artifact_it_replaces_never_holds(r
     assert [(e["kind"], e["matches_sides"]) for e in made["successors"]] == [("mixture", None)]
     assert made["per_shard_digests"] == "equal"
     assert (code, unmet_of(err)) == (
-        NOT_HELD, ["successor successor of mix-2: a mixture, not the shard it replaces"])
+        NOT_HELD, ["successor successor of mix-2: kind mixture, but the artifact it replaces is of kind shard"])
+
+
+def test_the_successor_line_reads_right_for_every_pair_of_kinds():
+    """The line for each pair of kinds, read from the gate itself: it keeps the list's form
+    "successor NAME: reason", names both kinds without an article, and holds no character the
+    list is split on (a semicolon)."""
+    from waterwhite import cli
+
+    for kind, replaced in (("mixture", "shard"), ("jsonl", "shard"), ("shard", "jsonl"),
+                           ("jsonl", "mixture"), ("shard", "mixture"), ("mixture", "jsonl")):
+        made = {"multisets": "equal", "mode": "unseeded", "per_shard_digests": "not compared",
+                "differences": [], "kept": [], "history": [], "caches": [],
+                "successors": [{"artifact": "A", "successor": "successor of A", "kind": kind,
+                                "registered": True, "answer": "does not contain", "matches_sides": True}]}
+        report = {"artifacts": [{"artifact": "A", "kind": replaced}]}
+        unmet = cli._unmet_conditions(made, report, sides_given=True)
+        assert unmet == [f"successor successor of A: kind {kind}, but the artifact it replaces is of kind {replaced}"]
+        assert ";" not in unmet[0]
 

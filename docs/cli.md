@@ -1089,8 +1089,8 @@ where the report names nothing of the kind to compare (stated below):
   it). A kept mixture or checkpoint has no file and is not asked.
 - every `successors` entry is registered, is the same kind of artifact as the one it
   replaces, answers "does not contain", and does not have `matches_sides` false
-  (`"successor NAME: not registered"`, `"successor NAME: a mixture, not the shard it
-  replaces"` (the kinds being those of the successor and of the report's entry),
+  (`"successor NAME: not registered"`, `"successor NAME: kind mixture, but the artifact it
+  replaces is of kind shard"` (the kinds being those of the successor and of the report's entry),
   `"successor NAME: may contain"` or the word of whatever other answer it gave,
   `"successor NAME: not the file compared"`). A successor of another kind has no
   file of the kind to compare, so its `matches_sides` is null and would say nothing.

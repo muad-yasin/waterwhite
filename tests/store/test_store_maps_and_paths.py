@@ -426,7 +426,7 @@ def test_a_document_is_read_from_its_own_byte_range(tmp_path):
 
 
 def test_a_shard_whose_stored_offsets_are_not_the_running_sum_of_its_lengths_is_refused(world, tmp_path):
-    """Sol's review of a011cd5, finding 3. Megatron (core_v0.20.0, indexed_dataset.py:
+    """The outside review of a011cd5, finding 3. Megatron (core_v0.20.0, indexed_dataset.py:
     ``__getitem__`` reads at ``sequence_pointers[idx]``) reads a document at the stored
     byte offset; Waterwhite takes the offset from the lengths. For the contiguous layout
     the two must agree, so a shard whose offsets do not is refused wherever the index is

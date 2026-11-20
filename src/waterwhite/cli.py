@@ -1199,7 +1199,7 @@ def _unmet_conditions(made: dict, report: dict, *, sides_given: bool) -> list[st
         # reads "matches_sides" null, which is no evidence that it replaces the shard.
         replaced = kinds.get(entry["artifact"])
         if entry["registered"] and replaced is not None and entry["kind"] != replaced:
-            unmet.append(f"successor {name}: a {entry['kind']}, not the {replaced} it replaces")
+            unmet.append(f"successor {name}: kind {entry['kind']}, but the artifact it replaces is of kind {replaced}")
         if not entry["registered"]:
             unmet.append(f"successor {name}: not registered")
         elif not v.is_negative_word(entry["answer"]):

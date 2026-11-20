@@ -94,7 +94,7 @@ def test_a_report_that_lacks_a_key_verify_reads_is_refused_with_exit_2(repair_wo
 
 
 def test_a_sides_path_that_is_not_text_is_refused_naming_the_side_and_the_artifact(repair_world, tmp_path):
-    """Sol's review of a011cd5: a number as a path in an otherwise valid sides file
+    """The outside review of a011cd5: a number as a path in an otherwise valid sides file
     raised an uncaught TypeError. A path is text; anything else is a refusal of the
     document, with exit 2, naming the side and the artifact."""
     report, sides = files(repair_world, tmp_path)
@@ -114,7 +114,7 @@ def test_a_sides_path_that_is_not_text_is_refused_naming_the_side_and_the_artifa
 
 
 def test_a_report_whose_kind_is_not_the_stores_kind_of_that_instance_is_refused(repair_world, tmp_path):
-    """C&C's ruling on the F2 gate: the gate compares a successor's kind with the kind
+    """The gate of ``--require-held`` compares a successor's kind with the kind
     the report states for the artifact it replaces. The report's instance id was held
     against the store, its kind was not, so a report that stated another kind than the
     store holds for that instance could pass ``--require-held``. It is refused."""
