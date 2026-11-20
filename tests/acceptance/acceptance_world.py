@@ -129,6 +129,7 @@ class World:
         self._copies: dict[tuple[str, str], CapturedFixture] = {}
         self._shown: dict[tuple[str, ...], Mapping] = {}
         self._lines: dict[Path, list[str]] = {}
+        self._manifests: dict[Path, dict[str, int]] = {}
         self._scratch = 0
         # The repairs of the stores of the table, and the documents the report and verify
         # printed for them (name, command line) -> the document or the failure.
@@ -1253,6 +1254,14 @@ class World:
         with ThreadPoolExecutor(SHOW_WORKERS) as pool:
             return list(pool.map(lambda arguments: self.cli(store_file, *arguments), commands))
 
+    def manifest_lines(self, path: Path) -> dict[str, int]:
+        """The line of each handle of a release's manifest. Read once for each file: a set has
+        thousands of entries and each names a release, and reading the manifest once for each entry
+        read the same file again and again."""
+        if path not in self._manifests:
+            self._manifests[path] = {row["handle"]: row["line"] for row in acceptance_sets.read_rows(path)}
+        return self._manifests[path]
+
     def _set_candidates(self, question: Question, size: str) -> list[Mismatch]:
         """Every row whose identical text reached a release from more than one
         source: the label and the sources of its link, and the answer the release
@@ -1264,8 +1273,7 @@ class World:
             raise WorldError("the counting script lists no row with candidates in this set")
         asked, of_source = [], {}
         for entry in entries:
-            manifest = {row["handle"]: row["line"] for row in acceptance_sets.read_rows(
-                Path(f"{self.file_of(store_file, entry['release'])}.manifest.jsonl"))}
+            manifest = self.manifest_lines(Path(f"{self.file_of(store_file, entry['release'])}.manifest.jsonl"))
             for record in entry["rows"]:
                 asked.append((entry, record, ("show", entry["release"], "--record",
                                               f"L{manifest[record]}")))

@@ -4,6 +4,10 @@ failed."""
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+from types import SimpleNamespace
+
 import acceptance_world
 import pytest
 import table
@@ -74,3 +78,31 @@ def test_a_set_build_that_failed_is_reported_with_its_first_cause_to_every_row(t
         with pytest.raises(RuntimeError, match="first cause 1"):
             sets.build("small", acceptance_sets.CAPTURE)
     assert calls == ["small"]
+
+
+def test_the_manifest_of_a_release_is_read_once_however_many_candidate_entries_name_it(tmp_path, monkeypatch):
+    import acceptance_sets
+
+    # two releases with manifests that give other lines to the same handles: an entry must read its own release's manifest
+    shards = {"R": tmp_path / "release-r", "S": tmp_path / "release-s"}
+    for release, offset in (("R", 0), ("S", 100)):
+        Path(f"{shards[release]}.manifest.jsonl").write_text(
+            "".join(json.dumps({"handle": f"h{i}", "line": i + 1 + offset}) + "\n" for i in range(40)), encoding="utf-8")
+    entries = [{"release": "RS"[i % 2], "rows": [f"h{i}"], "candidates": [{"id": f"x-{i + 1}", "source": "A"}],
+                "sources": ["A"]} for i in range(40)]
+    done = SimpleNamespace(exit_code=0, printed=lambda: {"edge": {"label": "L", "candidate_sources": ["A"]},
+                                                         "answer": "yes"})
+    world = World(tmp_path)
+    asked, reads = [], []
+    monkeypatch.setattr(world, "_set", lambda question, size: (
+        SimpleNamespace(counted={"check6": {"candidates": entries}}), tmp_path / "store.sqlite"))
+    monkeypatch.setattr(world, "file_of", lambda store_file, artifact: shards[artifact])
+    monkeypatch.setattr(world, "_many", lambda store_file, commands: asked.extend(commands) or [done] * len(commands))
+    monkeypatch.setattr(world, "cli", lambda store_file, *arguments: done)
+    real = acceptance_sets.read_rows
+    monkeypatch.setattr(acceptance_sets, "read_rows", lambda path: reads.append(path) or real(path))
+    expect = {"label": "L", "candidate_sources": ["A"], "answer_for_each_candidate_source": "yes"}
+    found = world._set_candidates(SimpleNamespace(expect=expect), "100k")
+    assert found == []
+    assert asked == [("show", "RS"[i % 2], "--record", f"L{i + 1 + (100 if i % 2 else 0)}") for i in range(40)]
+    assert len(reads) == 2, f"the manifests were read {len(reads)} times for 40 entries of two releases"
