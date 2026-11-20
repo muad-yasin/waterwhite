@@ -684,9 +684,16 @@ costs no query at all.
   operator note.
 
 Memory. The walk keeps the verdict of each record it has finished, so that a
-record many others derive from is walked once. The table is a cache: at 200,000
+record many others derive from is walked once. The table is a cache: at 1,000,000
 entries (`_walk.MEMO_LIMIT`) it is emptied and filled again, and the answers do
-not depend on it. A chain is walked with a stack of its own, so its length is not
+not depend on it. A walk over a generated store held about three entries for each
+source record (29,398 entries at 10,000 records, 299,488 at 100,000 on the stores
+measured), so a store of about 330,000 records reaches the limit, and a smaller one
+never empties the table. The growth of the walk's resident size between 200,000 and
+about 300,000 entries was about 120 bytes for each entry (182 to 195 MB and 234 to
+246 MB on two stores of 100,000 records), so a full table of 1,000,000 entries
+would hold about 120 MB: an estimate from that growth, not a measurement at that
+size. A chain is walked with a stack of its own, so its length is not
 bound by the interpreter's recursion limit. A chain that runs into itself fails
 (a). What grows with the artifact and stays: the untraced steps of a checkpoint's
 history, one entry per generation job a negative rests on, and the store's own

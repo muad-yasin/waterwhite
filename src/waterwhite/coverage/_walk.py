@@ -56,8 +56,10 @@ NOT_COVERED = 3  # an artifact only: its own record is missing
 
 # Statuses of records are kept while a walk runs, so that a record many others
 # derive from is walked once. The table is a cache and nothing more: when it is
-# full it is emptied, and a record met again is walked again.
-MEMO_LIMIT = 200_000
+# full it is emptied, and a record met again is walked again. A generated store holds
+# about three entries for each source record, so this limit is reached by a store of
+# about 330,000 records (docs/coverage.md, Memory).
+MEMO_LIMIT = 1_000_000
 
 
 @dataclass(frozen=True, slots=True)
