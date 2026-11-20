@@ -496,9 +496,11 @@ class Store(IntegrityMixin):
         return (found if found is not None else reached), reached
 
     @classmethod
-    def open(cls, path, *, readonly: bool = False) -> "Store":
+    def open(cls, path, *, readonly: bool = False, migrate_older: bool = True) -> "Store":
         """Open an existing store. A store of an older schema version is migrated
-        step by step first; a read-only open of such a store is refused. A path
+        step by step first; a read-only open of such a store is refused, and so is a
+        writable one made with ``migrate_older=False`` (a command that writes a little and
+        is not the command that migrates). A path
         that holds no store is ``NotAStore``; a store written by a newer version
         of the tool is ``NewerSchemaVersion``."""
         target = Path(path).resolve()
@@ -541,7 +543,7 @@ class Store(IntegrityMixin):
                     path=str(target),
                 )
             if found < SCHEMA_VERSION:
-                if readonly:
+                if readonly or not migrate_older:
                     raise Refused(
                         f"the store has schema version {found} and must be migrated to "
                         f"{SCHEMA_VERSION} first (the command line: waterwhite migrate --store FILE)"
@@ -1528,6 +1530,9 @@ class Store(IntegrityMixin):
         )
         with self._transaction() as conn:
             if self._existing(conn, instance, v.KIND_SHARD, name):
+                # Read just now as a shard of this layout (offsets and size): a shard registered
+                # under an earlier schema is checked by the read it is registered again with.
+                self._mark_shard_files(conn, instance, "passed")
                 return instance
             self._insert_artifact(
                 conn, instance=instance, kind=v.KIND_SHARD, role=None,
@@ -1535,7 +1540,49 @@ class Store(IntegrityMixin):
                 step=(step.name, step.version, step.param_digest), member_name=None,
                 edge_digest=edge_digest, name=name, inputs=inputs,
             )
+            self._mark_shard_files(conn, instance, "passed")
         return instance
+
+    @staticmethod
+    def _mark_shard_files(conn: sqlite3.Connection, instance: str, state: str) -> None:
+        conn.execute(
+            "INSERT INTO shard_files_check (artifact_id, state) "
+            "SELECT artifact_id, ? FROM artifact WHERE instance_id = ? "
+            "ON CONFLICT (artifact_id) DO UPDATE SET state = excluded.state",
+            (state, instance),
+        )
+
+    def recheck_shard_files(self) -> dict[str, int]:
+        """Read the two files of every registered shard that is at its recorded place, and
+        record what the read found (``shard_files_check``, schema 5): "passed" when the
+        pair is the registered one (its digest is the registered digest) and is a shard of
+        this layout, whose index gives the offsets and the .bin size ``read_shard`` holds
+        it to; "failed" when the pair is the registered one and is not. A pair that is not
+        the registered one is the digest check's fault (``check_integrity``) and records
+        nothing; a shard whose files are not at their place keeps what it had. A "failed"
+        shard stays failed: the registered digest names these bytes, and these bytes are
+        not a shard of this layout. Returns how many shards each result was recorded for."""
+        self._require_writable()
+        done = {"passed": 0, "failed": 0}
+        with self._transaction() as conn:
+            for row in conn.execute(
+                    "SELECT instance_id, path, content_digest FROM artifact "
+                    "WHERE kind = ? AND path IS NOT NULL ORDER BY artifact_id", (v.KIND_SHARD,)
+            ).fetchall():
+                prefix = self._disk_path(row["path"])
+                if not all(file.is_file() for file in artifact_files.shard_paths(prefix)):
+                    continue
+                if artifact_files.read_shard_once(prefix).digest != row["content_digest"]:
+                    continue
+                try:
+                    artifact_files.read_shard(prefix)
+                except UnsupportedFormat:
+                    state = "failed"
+                else:
+                    state = "passed"
+                self._mark_shard_files(conn, row["instance_id"], state)
+                done[state] += 1
+        return done
 
     def write_map(
         self,
@@ -2225,10 +2272,10 @@ class Store(IntegrityMixin):
             )
             conn.executemany(
                 "INSERT INTO trace_row (trace_id, sample_pos, row_pos, shard_position, ordinal, "
-                "token_start, token_end) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                "token_start, token_end, segment_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 self._feed("trace_row", (
                     (trace_id, s.sample_pos, row_pos, r.shard_position, r.ordinal,
-                     r.token_start, r.token_end)
+                     r.token_start, r.token_end, segment_id)
                     for s in trace.samples for row_pos, r in enumerate(s.rows)
                 )),
             )

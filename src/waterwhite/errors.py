@@ -161,6 +161,17 @@ class MapCountMismatch(IntegrityFault):
     name = "map count mismatch"
 
 
+class ShardFilesNotChecked(IntegrityFault):
+    """A negative answer rests on the map of a shard whose files are not at their recorded
+    place, and no check of those files has passed: the store holds none (a shard registered
+    under an earlier schema, before the offsets and the size of its pair were held to a
+    reading Megatron and this tool agree on), or the check found them not to be a shard of
+    this layout. Without the files the offsets cannot be looked at, so the negative is not
+    given; the check is made with the files present (``waterwhite check``)."""
+
+    name = "shard files not checked"
+
+
 class MapDigestMismatch(IntegrityFault):
     """A map or occurrence record whose digest does not match its artifact (2.2(d))."""
 

@@ -57,7 +57,7 @@ store.close()                                          # or: with Store.open(...
   `foreign_keys=ON`.
 - The schema is versioned in `meta.schema_version` and migrated one step at a time
   (`_migrate.STEPS`: version n is reached from n - 1 by step n; each step and its
-  version row are one transaction). The schema is at version 4. Step 1 is
+  version row are one transaction). The schema is at version 5. Step 1 is
   `schema.sql`; step 2 is `schema_2.sql`: a harness log gains the column `harness`
   (empty for every log written before, so after migration such a log establishes
   no bound: DECISIONS.md D-27), and the index over a shard's maps is
@@ -69,7 +69,15 @@ store.close()                                          # or: with Store.open(...
   SQLite reads two nulls as different. Step 4 is `schema_4.sql`: a harness log gains the
   column `hand_off_checked` (0 for every log already stored: nothing says its texts were ever
   compared, so after migration such a log establishes no bound until the texts are shown,
-  "The write methods"). `create` runs every step, so a new store
+  "The write methods"). Step 5 is `schema_5.sql`: a trace row gains the column `segment_id` (written with
+  the row, and for the rows already stored from their trace) with an index on (segment, shard position,
+  ordinal), so that `trace_hits` finds the rows of one document in one segment at a cost that
+  grows with neither the segment's steps nor the rows of the same document in other segments; and the
+  table `shard_files_check` holds, for each shard, "passed" or "failed" as a read of its two files found
+  (`Store.recheck_shard_files`, the command `check`), written at registration for a shard registered by
+  this version. A shard already stored has no row: a negative answer that rests on its map, with its
+  files not at their place, is not given until the check has passed (`ShardFilesNotChecked`, exit 3).
+  `create` runs every step, so a new store
   and a migrated one hold the same schema. `open` runs the missing steps; a
   read-only open of a store that needs a step is refused (`Refused`). A writable open
   migrates, and a command that does so says so in its output (`"migrated"`, with a sentence

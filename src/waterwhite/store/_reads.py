@@ -319,6 +319,15 @@ class ReadMixin(StoreCore):
             found = self.artifact_by_path(ref)
         return found
 
+    def shard_files_state(self, instance_id: str) -> str | None:
+        """What a check of the shard's files found: "passed", "failed", or None when none
+        was made (a shard registered under an earlier schema and not checked since; schema 5,
+        ``shard_files_check``)."""
+        row = self._conn.execute(
+            "SELECT c.state FROM shard_files_check c JOIN artifact a ON a.artifact_id = c.artifact_id "
+            "WHERE a.instance_id = ?", (instance_id,)).fetchone()
+        return None if row is None else row[0]
+
     def resolve_model(self, text: str) -> tuple[ModelRef, ...]:
         """The one reading of the model entry of a stored harness log (plan 2.2(h)): what
         each model the text names resolves to. The generating-model rule and the closure of the
@@ -1234,25 +1243,26 @@ class ReadMixin(StoreCore):
         """Every trace row of a segment that reads one document, in step order, with
         the coverage mark of its sample.
 
-        The statement starts from the document: the tables are joined in the order
-        written (CROSS JOIN), so the rows of the document are found through the index
-        on (shard position, ordinal) and the cost of a call does not grow with the steps
-        of the segment. Left to choose, SQLite started at the segment's steps and looked
-        the document up once per step, which made a walk over every document of a
-        checkpoint cost documents times steps. The order is complete: a step number is
-        one trace of a segment, and a row is one place in one sample, so no two rows tie.
-        No index is named, so a store without the index gives the same rows, slower."""
+        The statement starts from the segment and finds the rows of the document in it through
+        the index on (segment, shard position, ordinal) (schema 5), so the cost of a call
+        grows with neither the steps of the segment nor the rows that read the same document in
+        other segments. The tables are joined in the order written (CROSS JOIN): left to
+        choose, SQLite started at the segment's steps and looked the document up once per step,
+        which made a walk over every document of a checkpoint cost documents times steps. The
+        order is complete: a step number is one trace of a segment, and a row is one place in
+        one sample, so no two rows tie. A store of an earlier schema is not read (it must be
+        migrated first)."""
         upper = (1 << 62) if upto_step is None else upto_step
         for r in self._conn.execute(
             "SELECT t.step, r.sample_pos, r.row_pos, r.token_start, r.token_end, "
-            "x.sample_tokens, x.covered_tokens FROM trace_row r "
-            "CROSS JOIN step_trace t CROSS JOIN run_segment s CROSS JOIN trace_sample x "
-            "WHERE r.shard_position = ? AND r.ordinal = ? "
-            "AND t.trace_id = r.trace_id AND s.segment_id = t.segment_id "
+            "x.sample_tokens, x.covered_tokens FROM run_segment s "
+            "CROSS JOIN trace_row r CROSS JOIN step_trace t CROSS JOIN trace_sample x "
+            "WHERE s.name = ? AND r.segment_id = s.segment_id "
+            "AND r.shard_position = ? AND r.ordinal = ? "
+            "AND t.trace_id = r.trace_id AND t.step <= ? "
             "AND x.trace_id = r.trace_id AND x.sample_pos = r.sample_pos "
-            "AND s.name = ? AND t.step <= ? "
             "ORDER BY t.step, r.sample_pos, r.row_pos",
-            (shard_position, ordinal, segment, upper),
+            (segment, shard_position, ordinal, upper),
         ):
             yield TraceHit(*r)
 

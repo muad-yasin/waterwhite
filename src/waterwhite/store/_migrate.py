@@ -5,7 +5,9 @@ from version n - 1 by step n. Step 1 creates the schema of ``schema.sql``; step 
 runs ``schema_2.sql`` (a harness log names its harness; a map that did not verify
 no longer holds its namespace and derivation), step 3 runs ``schema_3.sql`` (the
 hand-off of a harness log keeps its order; one array of a blend has one digest), step 4
-runs ``schema_4.sql`` (a harness log says whether its handed texts were compared). All
+runs ``schema_4.sql`` (a harness log says whether its handed texts were compared), step 5 runs
+``schema_5.sql`` (a trace row names its segment, and a shard's files carry the result of a
+check). All
 ship as package data. A later schema adds a step and leaves the earlier ones as they
 are, so a store of any age is brought forward one step at a time and never rewritten
 in one jump, and a new store runs every step, so it holds the same schema as a
@@ -23,7 +25,7 @@ from importlib import resources
 
 from ..errors import CacheDigestConflict
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 
 def schema_sql(name: str = "schema.sql") -> str:
@@ -89,8 +91,16 @@ def _step_4(conn: sqlite3.Connection) -> None:
         conn.execute(statement)
 
 
+def _step_5(conn: sqlite3.Connection) -> None:
+    """The segment of each trace row, with the index that finds one segment's rows of a
+    document, and the table of what a check of a shard's files found (``schema_5.sql``).
+    Every shard already in the store has no row there: nothing says it was checked."""
+    for statement in split_statements(schema_sql("schema_5.sql")):
+        conn.execute(statement)
+
+
 # version reached -> the step that reaches it from the version before
-STEPS = {1: _step_1, 2: _step_2, 3: _step_3, 4: _step_4}
+STEPS = {1: _step_1, 2: _step_2, 3: _step_3, 4: _step_4, 5: _step_5}
 
 
 def apply_step(conn: sqlite3.Connection, version: int) -> None:

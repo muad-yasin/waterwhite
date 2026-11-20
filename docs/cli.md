@@ -41,7 +41,8 @@ The program is installed as `waterwhite`. It also runs as
   missing `--store` are usage errors: the error name is "usage" and `context`
   holds the usage line where the parser gives one.
 - `--help` prints the help text and exits with 0.
-- `query`, `show`, `check`, `report` and `verify` open the store read-only. `replay` opens none and takes no
+- `query`, `show`, `report` and `verify` open the store read-only; `check` opens it for writing, to record what it
+  found of each shard's files (below), and refuses a store that needs a migration step as they do. `replay` opens none and takes no
   `--store`. A path that holds no
   store (no file, a file that is not an SQLite file, a file with no schema of
   this tool) is refused with "not a store"; a store written by a newer build
@@ -107,7 +108,7 @@ Creates a store. It lists the joins the tool ships as verified (below), or, with
   "a file already exists at the store path"). The file is left as it was.
 - A folder that does not exist is refused (exit 4, "write refused").
 
-Output: `{"created": <path>, "schema_version": 4, "normaliser": ..., "verified_joins": [[tag, type, class], ...]}`.
+Output: `{"created": <path>, "schema_version": 5, "normaliser": ..., "verified_joins": [[tag, type, class], ...]}`.
 
 ## compare-hand-off
 
@@ -458,7 +459,20 @@ With no fault it prints
 `{"check": "passed", "artifacts": <n>, "missing_files": [...]}`. `missing_files`
 lists artifacts whose file is not at its recorded place. That is a state, not a
 fault: the records still answer, and a negative answer names such files in its
-scope.
+scope. The exception is a shard whose files are not at their place and which no check
+has passed (below): a negative answer that rests on its map is not given.
+
+`check` also reads the two files of every shard that is at its place and has its
+registered digest, and records for the shard what that read found (schema 5): "passed"
+when the pair is a shard of this layout, with the offsets and the `.bin` size its index
+gives (the reading Megatron and the token reader agree on), "failed" when it is not. It does
+so before the loud checks, so the record stays when a fault stops the command. A shard
+registered by this version has "passed" from its registration. A shard of a store made
+before schema 5 has no record until a check has read its files; a query whose negative
+answer rests on the map of such a shard, or of a shard that "failed", with its files not at
+their place, exits with 3 and the name "shard files not checked" and prints no answer. With
+the files at their place the query's loud checks read them as before. A shard that "failed" stays
+failed: the registered digest names those bytes.
 
 ## migrate
 
@@ -473,7 +487,10 @@ naming this command. A store already at this version is left as it is. It prints
 `{"schema_version_found": <n>, "schema_version": <m>, "steps_run": <m - n>}`, and, when it
 ran steps, `"migrated": {"from", "to", "note"}`: from version 4 on the note says that every
 stored harness log now reads as not compared, so that a clean answer past a generation step
-reads "may contain" until `compare-hand-off` is given the texts. Any other command that opens
+reads "may contain" until `compare-hand-off` is given the texts; from version 5 on, that every
+shard reads as not checked, so that a negative answer resting on the map of a shard whose files
+are not at their place is not given until `check` has read them. Step 5 also writes the segment
+of every trace row and indexes it (its time grows with the rows of the store's traces). Any other command that opens
 a store for writing and has to migrate it adds the same `"migrated"` entry to its output. The
 refusals are those of opening a store: "not a store", "store of a newer schema
 version". A step can refuse a store it cannot bring forward: step 3 refuses one that

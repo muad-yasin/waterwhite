@@ -37,7 +37,7 @@ from collections.abc import Callable, Iterable
 from .. import extensions
 from .. import vocabulary as v
 from ..answers import Answer, Finding, Proof, Scope, claim_proof_mint
-from ..errors import Refused, TemporalAncestryCycle, UnsupportedSelector
+from ..errors import Refused, ShardFilesNotChecked, TemporalAncestryCycle, UnsupportedSelector
 from ..requests import Withdrawal
 from ..store.views import Artifact
 from ._walk import CLEAR, HOLDS, MAY, NOT_COVERED, Outcome, Session
@@ -176,6 +176,11 @@ def _conclude(mint, walk: Session, artifact: Artifact, outcome: Outcome) -> Proo
         )
     assert outcome.verdict == CLEAR
 
+    # A negative that rests on the map of a shard whose files are not here needs the check of
+    # those files: with them gone, the offsets in their index cannot be looked at now.
+    missing = _missing_files(walk, artifact)
+    _require_shard_files_checked(walk.store, missing)
+
     # Conditions (a) to (g) hold and no record in scope was found.
     notes: tuple[str, ...] = ()
     if outcome.generation and not walk.generating_model_on:
@@ -192,14 +197,33 @@ def _conclude(mint, walk: Session, artifact: Artifact, outcome: Outcome) -> Proo
         generation_edges=outcome.jobs,
         harness_logs=tuple(walk.logs[job] for job in outcome.jobs),
         walked=outcome.walked,
-        files_not_checked=tuple(
-            walk.name(missing.instance_id) for missing in _missing_files(walk, artifact)
-        ),
+        files_not_checked=tuple(walk.name(lacking.instance_id) for lacking in missing),
     )
     return mint(
         instance_id=artifact.instance_id, kind=artifact.kind, names=artifact.names, request=request,
         scope=scope, notes=notes, passed_generation=outcome.generation, current=walk.holds_for_proof(),
     )
+
+
+def _require_shard_files_checked(store, missing) -> None:
+    """The negative is not given while a shard of the closure is without its files and no
+    check of them has passed (``ShardFilesNotChecked``): none was made, or it failed."""
+    for lacking in missing:
+        if lacking.kind != v.KIND_SHARD:
+            continue
+        state = store.shard_files_state(lacking.instance_id)
+        if state == "passed":
+            continue
+        where = f"the files of shard {lacking.instance_id} are not at {lacking.path}"
+        if state == "failed":
+            detail = (f"{where}, and when they were last checked they were not a shard of this "
+                      "layout (the offsets or the size of its index): the negative is not given")
+        else:
+            detail = (f"{where}, and no check of them has passed (the store registered the shard "
+                      "before its offsets and size were held to the token reader): the negative is "
+                      "not given until the files are put back and `waterwhite check` has read them")
+        raise ShardFilesNotChecked(
+            detail, instance=lacking.instance_id, path=lacking.path, state=state)
 
 
 def _missing_files(walk: Session, artifact: Artifact):

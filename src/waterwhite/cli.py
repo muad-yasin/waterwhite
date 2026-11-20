@@ -472,7 +472,11 @@ def _compare_hand_off(args: argparse.Namespace) -> tuple[dict, str]:
 
 
 def _check(args: argparse.Namespace) -> tuple[dict, str]:
-    with Store.open(_store_path(args), readonly=True) as store:
+    # Opened for writing: the check reads the two files of every shard that is at its place and
+    # records what it found (``Store.recheck_shard_files``), before the loud checks run, so that
+    # the result stays when a loud check stops the command.
+    with Store.open(_store_path(args), migrate_older=False) as store:
+        store.recheck_shard_files()
         store.check_integrity(None)
         out = {
             "check": "passed",
@@ -1389,11 +1393,21 @@ def _report_text(document: dict) -> str:
 # --- The one way in and out -----------------------------------------------------------
 
 
-MIGRATION_NOTE = (
-    "this store was migrated from schema version {found} to {reached}: its harness logs now read as "
-    "not compared, so a clean answer past a generation step reads \"may contain\" until the texts "
-    "the jobs were handed are shown (waterwhite compare-hand-off)"
+MIGRATION_NOTES = (
+    (4, "its harness logs now read as not compared, so a clean answer past a generation step reads "
+        "\"may contain\" until the texts the jobs were handed are shown (waterwhite compare-hand-off)"),
+    (5, "its shards read as not checked, so a negative answer that rests on the map of a shard whose "
+        "files are not at their recorded place is not given until the files are put back and "
+        "waterwhite check has read them"),
 )
+
+
+def migration_note(found: int, reached: int) -> str:
+    """What the steps from ``found`` to ``reached`` change in the answers of the store: one
+    clause for each step that does."""
+    clauses = [text for version, text in MIGRATION_NOTES if found < version <= reached]
+    return (f"this store was migrated from schema version {found} to {reached}: "
+            + "; and ".join(clauses))
 
 
 def _wants_text(argv: Sequence[str]) -> bool:
@@ -1437,13 +1451,13 @@ def main(argv: Sequence[str] | None = None, *, stdout: TextIO | None = None,
             Store.migration_hook = None
         if migrated and isinstance(value, dict):
             found, reached = migrated[0]
-            note = MIGRATION_NOTE.format(found=found, reached=reached)
+            note = migration_note(found, reached)
             value = {**value, "migrated": {"from": found, "to": reached, "note": note}}
             text = f"{text}\n{note}"
         printed = text if as_text else json.dumps(value, indent=2, ensure_ascii=False)
     except WaterwhiteError as error:
         # A store that was migrated before the command was refused stays migrated: say so here too.
-        note = MIGRATION_NOTE.format(found=migrated[0][0], reached=migrated[0][1]) if migrated else None
+        note = migration_note(migrated[0][0], migrated[0][1]) if migrated else None
         if as_text:
             err.write(f"error: {error.name}" + (f": {error.detail}" if error.detail else "") + "\n")
             if note:
