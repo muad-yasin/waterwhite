@@ -135,7 +135,7 @@ def test_a_report_whose_kind_is_not_the_stores_kind_of_that_instance_is_refused(
 def test_a_report_that_calls_a_shard_a_mixture_does_not_let_a_mixture_stand_for_it(repair_world):
     """The case the kind check exists for. Before it, a report that stated "mixture" for a
     shard, with a mixture registered under the successor name and both sides naming the
-    shard, exited 0 under ``--require-held`` (checked on 36559fc, in both modes)."""
+    shard, exited 0 under ``--require-held`` (checked on the tree before the check was added, in both modes)."""
     from rb_kit import copy_shard
     folder = repair_world.folder
     copy_shard(folder, "shards/shard-3", "sides/both/shard-3")
