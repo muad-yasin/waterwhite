@@ -110,6 +110,36 @@ ROW_KEYS = ("record", "label", "token_start", "token_end", "parent", "candidates
 FIXTURE_SHARDS = "E/"
 
 
+# When this variable is set, every file of a built store and of its files is made read-only once its
+# set-up (the runs registered) is done, so that a row that writes to a store that other rows, or other
+# files of the same session, read fails where it writes instead of changing what they read. A row
+# that writes works on ``copy()``, which thaws what it copies. The variable is the one the runner of
+# a set sets when it puts several files into one session (so that the stores are built once).
+FREEZE_VARIABLE = "WATERWHITE_ACCEPTANCE_FREEZE"
+
+
+def _files_under(*roots: Path):
+    for root in roots:
+        for path in Path(root).rglob("*"):
+            if path.is_file() and not path.is_symlink():
+                yield path
+
+
+def freeze(built: CapturedFixture) -> None:
+    """Make the files of a built store read-only (folders stay writable: a reader of a store in the
+    write-ahead mode makes its ``-shm`` file beside it)."""
+    if not os.environ.get(FREEZE_VARIABLE):
+        return
+    for path in _files_under(built.store.parent, built.out):
+        path.chmod(path.stat().st_mode & ~0o222)
+
+
+def thaw(folder: Path) -> None:
+    """Undo ``freeze`` for a folder that was copied from frozen files."""
+    for path in _files_under(folder):
+        path.chmod(path.stat().st_mode | 0o200)
+
+
 class WorldError(Exception):
     """The acceptance infrastructure cannot do what a row asks of it."""
 
@@ -180,6 +210,7 @@ class World:
         built = replica_fixture.build_table_store(self.base / "stores" / name, name,
                                                   **arguments)
         self._register_runs(name, built)
+        freeze(built)
         for registered in built.instances:
             try:
                 needs = table.artifact_needs(registered)
@@ -251,6 +282,7 @@ class World:
         built = self.store(name)
         folder = self.base / "copies" / f"{name}--{label}"
         shutil.copytree(built.store.parent, folder)
+        thaw(folder)  # a copy is where a row writes
         return dataclasses.replace(built, store=folder / built.store.name,
                                    out=folder / built.out.name)
 
