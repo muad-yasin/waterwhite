@@ -42,7 +42,26 @@ def read_document(path, form: str, what: str) -> dict:
         raise UsageError(f"the {what} is not JSON: {error}", path=str(path)) from None
     if not isinstance(document, dict) or document.get("form") != form:
         raise Refused(f"the {what} is not a document of the form {form}", path=str(path))
+    if form == v.FORM_SIDES:
+        _check_sides_paths(document, what, path)
     return document
+
+
+def _check_sides_paths(document: Mapping, what: str, path) -> None:
+    """Every value of the two sides is a path, so text (docs/interfaces.md 7.2). A value
+    that is not is refused here, once, naming the side and the artifact, before any
+    reader takes it for a path. A side that is neither null nor an object is refused later, where
+    the side is read ("the sides file's repaired is not an object")."""
+    for which in ("repaired", "reference"):
+        side = document.get(which)
+        if not isinstance(side, Mapping):
+            continue
+        for artifact, named in side.items():
+            if not isinstance(named, str):
+                raise Refused(
+                    f"the {what} names {artifact} on its {which} side by something that is "
+                    f"not a path (text): {json.dumps(named)}",
+                    path=str(path), side=which, artifact=artifact)
 
 
 # --- The report, as far as verify reads it ---------------------------------------------

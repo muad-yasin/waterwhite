@@ -1460,7 +1460,8 @@ and the wall of section 1 keeps the expected answers out of its code.
 The keys of `repaired` and `reference` are the names of the historical artifacts,
 the ones the report names. A value is the path of a JSONL file, or the prefix of a
 shard (the path without `.bin` and `.idx`), relative to the folder of the sides file
-or absolute. The repaired side names every artifact the report lists with the action
+or absolute: text, and any other value (a number, null, a list) is refused as "request
+refused", naming the side and the artifact. The repaired side names every artifact the report lists with the action
 keep, rewrite or "clean, place not stated" that the builder wrote. The reference side is
 built by the same builder from source revisions that never held the withdrawn content,
 and names the same artifacts. A name on one side only is not compared and is listed in
