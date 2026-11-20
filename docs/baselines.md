@@ -345,7 +345,7 @@ handles), from the fixture spec or from the plant list, or is a named input of t
   sha256 like the seeded files. The worker counts compared are one worker against four (the count of the worlds of record) on a machine
   under 24 GB of memory or under eight cores, and one against four and against one for each core on
   a larger machine. Limit: the branch of the tests for a larger machine (worlds of one, four and one for each core, built together)
-  has not run on any machine. What guards every file, the unseeded ones included, is its sha256 in
+  has run on one rented server (16 cores, 30 GiB of memory), where its tests passed; its memory was not measured there. What guards every file, the unseeded ones included, is its sha256 in
   `WORLD.sha256`: a run refuses the world before any tool starts (stage `world-hash`, see "Before a
   tool starts") when a file is not the listed one, a listed file is not there, a path is listed
   twice, a path `world.json` names has no row, `world.json` has no row or the folder has no

@@ -162,6 +162,8 @@ The table gives the build-folder size for each capture mode and the store-file s
 
 ## Query, proof walk and repair
 
+The query times and proof walk times in this section are the first commit's figures. A later commit changed the statement of the store that finds the trace rows of one document; these times were not measured again with it.
+
 Capture-on runs only: a capture-off run has no store to query or repair. The query times `waterwhite query withdraw A --artifact probe@N` for one artifact. `probe@N` is the checkpoint the probe run registers at its last step, and N is the number of steps that run reports, so it differs between workloads. The proof walk times `waterwhite query withdraw A` across the store. The replica runs the repair on a copy of the store. It counts the historical build size and the starting store size as bytes read. It counts the repaired build size and the increase in store size as bytes rewritten. These are sizes of files, not measured disk I/O.
 
 | records | characters | derivations | sources | layout | workers | query time, on (s) | proof walk time, on (s) | repair reads (bytes) | repair rewrites (bytes) | runs on |

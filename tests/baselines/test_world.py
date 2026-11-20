@@ -2040,7 +2040,7 @@ def test_the_document_and_the_decisions_say_the_unseeded_files_are_compared_orde
     # The worker counts compared are stated: the world of one worker and a world of four (the count of the worlds of record,
     # CNC ruling of 18 Nov 2026; old: two on a small machine).
     assert re.search(r"one worker", body) and re.search(r"\bfour\b", body), "D-WORLD-8 does not state the worker counts compared"
-    assert "has not run on any machine" in section, "the section of the world builder names no limit of the large-machine branch"
+    assert "its memory was not measured" in section, "the section of the world builder names no limit of the large-machine branch"
     for number in (5, 8):
         assert _banned_in(blocks[number]) == [], (number, _banned_in(blocks[number]))
 
