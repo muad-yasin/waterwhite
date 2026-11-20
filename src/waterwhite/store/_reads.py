@@ -1232,15 +1232,25 @@ class ReadMixin(StoreCore):
         self, segment: str, shard_position: int, ordinal: int, *, upto_step: int | None = None
     ) -> Iterator[TraceHit]:
         """Every trace row of a segment that reads one document, in step order, with
-        the coverage mark of its sample."""
+        the coverage mark of its sample.
+
+        The statement starts from the document: the tables are joined in the order
+        written (CROSS JOIN), so the rows of the document are found through the index
+        on (shard position, ordinal) and the cost of a call does not grow with the steps
+        of the segment. Left to choose, SQLite started at the segment's steps and looked
+        the document up once per step, which made a walk over every document of a
+        checkpoint cost documents times steps. The order is complete: a step number is
+        one trace of a segment, and a row is one place in one sample, so no two rows tie.
+        No index is named, so a store without the index gives the same rows, slower."""
         upper = (1 << 62) if upto_step is None else upto_step
         for r in self._conn.execute(
             "SELECT t.step, r.sample_pos, r.row_pos, r.token_start, r.token_end, "
             "x.sample_tokens, x.covered_tokens FROM trace_row r "
-            "JOIN step_trace t ON t.trace_id = r.trace_id "
-            "JOIN run_segment s ON s.segment_id = t.segment_id "
-            "JOIN trace_sample x ON x.trace_id = r.trace_id AND x.sample_pos = r.sample_pos "
-            "WHERE r.shard_position = ? AND r.ordinal = ? AND s.name = ? AND t.step <= ? "
+            "CROSS JOIN step_trace t CROSS JOIN run_segment s CROSS JOIN trace_sample x "
+            "WHERE r.shard_position = ? AND r.ordinal = ? "
+            "AND t.trace_id = r.trace_id AND s.segment_id = t.segment_id "
+            "AND x.trace_id = r.trace_id AND x.sample_pos = r.sample_pos "
+            "AND s.name = ? AND t.step <= ? "
             "ORDER BY t.step, r.sample_pos, r.row_pos",
             (shard_position, ordinal, segment, upper),
         ):
