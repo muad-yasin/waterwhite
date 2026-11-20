@@ -57,7 +57,7 @@ ww = _load_world()
 
 # --- The expected values ------------------------------------------------------------------
 
-SCHEMA_NOW = 4  # step 3 is the subject of this file; step 4 (the log's mark) follows it
+SCHEMA_NOW = 5  # step 3 is the subject of this file; steps 4 (the log's mark) and 5 follow it
 SCHEMA_BEFORE = 2
 NAME_CACHE = "cache digest conflict"
 EXIT_LOUD_FAULT = 3
@@ -132,6 +132,9 @@ def take_step_3_back(path: Path) -> None:
     version row says 2."""
     raw = sqlite3.connect(path)
     try:
+        raw.execute("DROP INDEX trace_row_segment_document")  # step 5 taken back first
+        raw.execute("ALTER TABLE trace_row DROP COLUMN segment_id")
+        raw.execute("DROP TABLE shard_files_check")
         raw.execute("ALTER TABLE harness_log DROP COLUMN hand_off_checked")  # step 4 taken back first
         raw.execute(f"DROP INDEX {INDEX_POSITION}")
         raw.execute(f"DROP INDEX {INDEX_BLEND}")
@@ -376,7 +379,7 @@ def test_the_command_line_migrates_a_version_2_store_by_two_steps(tmp_path):
     code, said = run_cli("migrate", "--store", str(path))
     assert code == 0
     assert {k: said[k] for k in ("schema_version_found", "schema_version", "steps_run")} == {
-        "schema_version_found": SCHEMA_BEFORE, "schema_version": SCHEMA_NOW, "steps_run": 2}
+        "schema_version_found": SCHEMA_BEFORE, "schema_version": SCHEMA_NOW, "steps_run": 3}
 
 
 # --- The digest of a run record is the digest of the text the store holds -------------------

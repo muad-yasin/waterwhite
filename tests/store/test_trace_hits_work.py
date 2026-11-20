@@ -8,7 +8,10 @@ handler counts one per ten), not as seconds and not as the text of a query plan,
 can fake and no SQLite version changes.
 
 The stores are made small and by hand: a segment of S steps, step k reading document k, and the
-first document read again in the last step.
+first document read again in the last step. A second segment can read the same document in as many
+steps as a test asks, its traces numbered between the first segment's (the order a store has when
+two segments are traced in turns): the rows of the document in the other segment are rows of
+another answer, and the work of a call for the first segment must not count them.
 """
 
 from __future__ import annotations
@@ -23,22 +26,45 @@ from waterwhite.store import Store, views
 SEGMENT = "probe/seg-1"
 
 
-def make_store(path: Path, steps: int, *, drop_index: bool = False) -> Store:
+def make_store(path: Path, steps: int, *, drop_index: bool = False, other_rows: int = 0) -> Store:
     Store.create(path, normaliser="control-chars/1").close()
     con = sqlite3.connect(path)
     con.execute("PRAGMA foreign_keys = OFF")
+    # a store of schema 5 has the segment of each row and an index on it; the rows are written
+    # the same for a store of the schema before, which the review's probe was made on
+    has_segment = "segment_id" in {c[1] for c in con.execute("PRAGMA table_info(trace_row)")}
+    index = "trace_row_segment_document" if has_segment else "trace_row_document"
+
+    def row(trace_id: int, row_pos: int, ordinal: int, start: int, end: int, segment_id: int) -> None:
+        columns = "trace_id, sample_pos, row_pos, shard_position, ordinal, token_start, token_end"
+        values = (trace_id, 0, row_pos, 0, ordinal, start, end)
+        if has_segment:
+            columns, values = columns + ", segment_id", values + (segment_id,)
+        con.execute(f"INSERT INTO trace_row ({columns}) VALUES ({', '.join('?' * len(values))})", values)
+
     con.execute("INSERT INTO run (run_id, name) VALUES (1, 'probe')")
-    con.execute("INSERT INTO run_segment (segment_id, run_id, name, position, start_kind, trace_route) "
-                "VALUES (1, 1, ?, 0, 'fresh', 'cache files')", (SEGMENT,))
-    for k in range(1, steps + 1):
-        con.execute("INSERT INTO step_trace (trace_id, segment_id, step, consumed_samples) VALUES (?, 1, ?, 1)", (k, k))
+    for segment_id, name in ((1, SEGMENT), (2, "probe/seg-2")):
+        con.execute("INSERT INTO run_segment (segment_id, run_id, name, position, start_kind, trace_route) "
+                    "VALUES (?, 1, ?, ?, 'fresh', 'cache files')", (segment_id, name, segment_id - 1))
+
+    def trace(trace_id: int, segment_id: int, step: int) -> None:
+        con.execute("INSERT INTO step_trace (trace_id, segment_id, step, consumed_samples) VALUES (?, ?, ?, 1)",
+                    (trace_id, segment_id, step))
         con.execute("INSERT INTO trace_sample (trace_id, sample_pos, global_index, rank, sample_tokens, covered_tokens) "
-                    "VALUES (?, 0, ?, 0, 8, 8)", (k, k))
-        con.execute("INSERT INTO trace_row VALUES (?, 0, 0, 0, ?, 0, 5)", (k, k))
+                    "VALUES (?, 0, ?, 0, 8, 8)", (trace_id, step))
+
+    for k in range(1, steps + 1):
+        trace(2 * k, 1, k)
+        row(2 * k, 0, k, 0, 5, 1)
     # the first document is read again in the last step, twice in one sample: two rows in one order
-    con.execute("INSERT INTO trace_row VALUES (?, 0, 1, 0, 1, 5, 8)", (steps,))
+    row(2 * steps, 1, 1, 5, 8, 1)
+    # the other segment reads the document the tests ask for (ordinal 50) in `other_rows` steps,
+    # each trace numbered just after one of the first segment's
+    for j in range(1, other_rows + 1):
+        trace(2 * j + 1, 2, j)
+        row(2 * j + 1, 0, 50, 0, 5, 2)
     if drop_index:
-        con.execute("DROP INDEX trace_row_document")
+        con.execute(f"DROP INDEX {index}")
     con.commit()
     con.close()
     return Store.open(path, readonly=True)
@@ -75,6 +101,27 @@ def test_the_work_of_one_call_does_not_grow_with_the_steps_of_the_segment(tmp_pa
     assert small_work > 0
     # sixteen times the steps: the work of the call stays about the same (it was sixteen times)
     assert big_work <= 2 * small_work + 5, (small_work, big_work)
+
+
+def test_the_work_of_one_call_does_not_grow_with_the_rows_of_the_same_document_in_other_segments(tmp_path):
+    """The outside review of 504bf64: the index kept for the document ran across all segments,
+    so 1,600 rows of the same document in another segment raised the work for the same
+    one-row answer from about a hundred to 28,900 instructions. The rows of the other segment
+    are numbered between the rows of this one, so a range of trace numbers would not hold them
+    off either."""
+    with make_store(tmp_path / "alone.db", 100) as alone, \
+            make_store(tmp_path / "crowded.db", 100, other_rows=1600) as crowded:
+        alone_work, alone_rows = vm_work(alone, lambda: hits(alone, 50))
+        crowded_work, crowded_rows = vm_work(crowded, lambda: hits(crowded, 50))
+    assert alone_rows == crowded_rows == [views.TraceHit(50, 0, 0, 0, 5, 8, 8)]
+    assert alone_work > 0
+    assert crowded_work <= 2 * alone_work + 5, (alone_work, crowded_work)
+
+
+def test_the_other_segment_has_its_own_rows_of_the_document(tmp_path):
+    with make_store(tmp_path / "s.db", 100, other_rows=3) as store:
+        assert [h.step for h in store.trace_hits("probe/seg-2", 0, 50)] == [1, 2, 3]
+        assert [h.step for h in store.trace_hits(SEGMENT, 0, 50)] == [50]
 
 
 def test_a_store_without_the_document_index_gives_the_same_rows_and_no_database_error(tmp_path):

@@ -347,6 +347,9 @@ def test_show_says_whether_the_log_establishes_a_bound_and_prints_no_new_key(tmp
 def _step_back_to_version_3(db: Path) -> None:
     raw = sqlite3.connect(db)
     try:
+        raw.execute("DROP INDEX trace_row_segment_document")  # step 5 taken back first
+        raw.execute("ALTER TABLE trace_row DROP COLUMN segment_id")
+        raw.execute("DROP TABLE shard_files_check")
         raw.execute("ALTER TABLE harness_log DROP COLUMN hand_off_checked")
         raw.execute("UPDATE meta SET value = '3' WHERE key = 'schema_version'")
         raw.commit()
@@ -362,12 +365,12 @@ def test_a_store_of_schema_version_3_is_refused_read_only_until_migrated_and_the
     finally:
         w.store.close()
     _step_back_to_version_3(w.db)
-    with pytest.raises(errors.Refused, match="must be migrated to 4 first"):
+    with pytest.raises(errors.Refused, match="must be migrated to 5 first"):
         Store.open(w.db, readonly=True)
     out, err = io.StringIO(), io.StringIO()
     assert cli.main(["migrate", "--store", str(w.db)], stdout=out, stderr=err) == 0
     said = json.loads(out.getvalue())
-    assert (said["schema_version_found"], said["schema_version"], said["steps_run"]) == (3, 4, 1)
+    assert (said["schema_version_found"], said["schema_version"], said["steps_run"]) == (3, 5, 2)
     assert said["migrated"]["from"] == 3 and "compare-hand-off" in said["migrated"]["note"]
     with Store.open(w.db, readonly=True) as store:
         assert store.harness_log(JOB).hand_off_checked is False
@@ -391,7 +394,7 @@ def test_a_command_that_opens_a_version_3_store_for_writing_says_that_it_migrate
     assert code == 0, err.getvalue()
     said = json.loads(out.getvalue())
     assert said["hand_off_checked"] is True
-    assert said["migrated"]["from"] == 3 and said["migrated"]["to"] == 4
+    assert said["migrated"]["from"] == 3 and said["migrated"]["to"] == 5
     assert "may contain" in said["migrated"]["note"]
     # a command on a store that needs no migration says nothing of one
     out2 = io.StringIO()
@@ -412,9 +415,9 @@ def test_a_refused_command_that_migrated_a_version_3_store_still_says_it_migrate
     code = cli.main(["compare-hand-off", "--job", JOB, "--texts", path, "--store", str(w.db)], stdout=out, stderr=err)
     assert (code, out.getvalue()) == (errors.EXIT_WRITE_REFUSED, "")
     said = json.loads(err.getvalue())
-    assert said["migrated"]["from"] == 3 and said["migrated"]["to"] == 4 and "may contain" in said["migrated"]["note"]
+    assert said["migrated"]["from"] == 3 and said["migrated"]["to"] == 5 and "may contain" in said["migrated"]["note"]
     assert TEXT_A not in err.getvalue() and TEXT_B not in err.getvalue()
-    assert Store.open(w.db, readonly=True).schema_version == 4  # the step is committed: the store stays migrated
+    assert Store.open(w.db, readonly=True).schema_version == 5  # the step is committed: the store stays migrated
 
 
 def test_compare_hand_off_names_a_badly_written_record_as_an_invalid_record_not_a_selector(tmp_path):
@@ -472,7 +475,7 @@ def test_query_through_the_command_line_on_a_migrated_store_says_may_contain_unt
     refused = io.StringIO()
     assert cli.main(["query", "withdraw", "B", "--artifact", "gen/W", "--store", str(w.db)],
                     stdout=io.StringIO(), stderr=refused) == errors.EXIT_REFUSED  # version 3: refused until migrated
-    assert "must be migrated to 4 first" in refused.getvalue()
+    assert "must be migrated to 5 first" in refused.getvalue()
     assert cli.main(["migrate", "--store", str(w.db)], stdout=io.StringIO(), stderr=io.StringIO()) == 0
     before = query()
     assert (before["answer"], before["names"]) == ("may contain", v.NAMES_BOUND_NOT_ESTABLISHED)

@@ -45,7 +45,7 @@ def _load_world():
 
 ww = _load_world()
 
-SCHEMA = 4
+SCHEMA = 5  # the version a store is at now; the hand-off mark is step 4
 JOB = "job-1"
 NO_TEXTS = "the log has no handed_texts field"
 TEXT_A = "The repair workshop meets on the first Tuesday of the month."

@@ -311,8 +311,8 @@ def world(tmp_path: Path) -> World:
 
 def test_create_writes_meta_and_opens_with_the_fixed_pragmas(tmp_path):
     store = Store.create(tmp_path / "s.db", normaliser=NORMALISER, verified_joins=[JOIN, JOIN])
-    assert store.meta() == {"schema_version": "4", "normaliser": NORMALISER}
-    assert store.schema_version == 4 and store.normaliser == NORMALISER
+    assert store.meta() == {"schema_version": "5", "normaliser": NORMALISER}
+    assert store.schema_version == 5 and store.normaliser == NORMALISER
     assert store.verified_joins() == (JOIN,)
     pragma = lambda name: store._conn.execute(f"PRAGMA {name}").fetchone()[0]
     assert (pragma("journal_mode"), pragma("synchronous"), pragma("foreign_keys")) == ("wal", 2, 1)
@@ -354,10 +354,10 @@ def test_create_and_open_refusals(tmp_path):
         Store.open(tmp_path / "other.db", readonly=True)
 
     raw = sqlite3.connect(tmp_path / "s.db")
-    raw.execute("UPDATE meta SET value = '5' WHERE key = 'schema_version'")
+    raw.execute("UPDATE meta SET value = '6' WHERE key = 'schema_version'")
     raw.commit()
     raw.close()
-    with pytest.raises(errors.NewerSchemaVersion, match="schema version 5") as caught:
+    with pytest.raises(errors.NewerSchemaVersion, match="schema version 6") as caught:
         Store.open(tmp_path / "s.db")
     assert caught.value.name == "store of a newer schema version"
     assert caught.value.exit_code == errors.EXIT_REFUSED
@@ -408,27 +408,27 @@ def test_settings_round_trip(tmp_path):
 def test_migration_runs_step_by_step_and_a_failed_step_changes_nothing(tmp_path, monkeypatch):
     Store.create(tmp_path / "s.db", normaliser=NORMALISER).close()
 
-    def step_5(conn):
-        conn.execute("CREATE TABLE added_by_step_5 (x INTEGER)")
-
     def step_6(conn):
         conn.execute("CREATE TABLE added_by_step_6 (x INTEGER)")
-        raise RuntimeError("step 6 breaks")
 
-    monkeypatch.setattr(_migrate, "STEPS", {**_migrate.STEPS, 5: step_5, 6: step_6})
-    monkeypatch.setattr(_migrate, "SCHEMA_VERSION", 6)
-    monkeypatch.setattr("waterwhite.store.store.SCHEMA_VERSION", 6)
+    def step_7(conn):
+        conn.execute("CREATE TABLE added_by_step_7 (x INTEGER)")
+        raise RuntimeError("step 7 breaks")
+
+    monkeypatch.setattr(_migrate, "STEPS", {**_migrate.STEPS, 6: step_6, 7: step_7})
+    monkeypatch.setattr(_migrate, "SCHEMA_VERSION", 7)
+    monkeypatch.setattr("waterwhite.store.store.SCHEMA_VERSION", 7)
     with pytest.raises(errors.Refused, match="migrated"):
         Store.open(tmp_path / "s.db", readonly=True)
-    with pytest.raises(RuntimeError, match="step 6 breaks"):
+    with pytest.raises(RuntimeError, match="step 7 breaks"):
         Store.open(tmp_path / "s.db")
     raw = sqlite3.connect(tmp_path / "s.db")
     tables = {r[0] for r in raw.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
     version = raw.execute("SELECT value FROM meta WHERE key = 'schema_version'").fetchone()[0]
     raw.close()
-    # Step 5 ran and is recorded; step 6 was rolled back whole.
-    assert "added_by_step_5" in tables and "added_by_step_6" not in tables
-    assert version == "5"
+    # Step 6 ran and is recorded; step 7 was rolled back whole.
+    assert "added_by_step_6" in tables and "added_by_step_7" not in tables
+    assert version == "6"
 
 
 def test_schema_script_splits_into_its_statements():

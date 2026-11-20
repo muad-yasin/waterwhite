@@ -382,7 +382,7 @@ def test_a_version_1_store_is_migrated_to_version_2_and_matches_a_new_store(tmp_
     assert "harness" not in columns
 
     with Store.open(old) as store:
-        assert store.schema_version == 4
+        assert store.schema_version == 5
     conn = sqlite3.connect(old)
     rows = conn.execute("SELECT job_name, model, harness FROM harness_log").fetchall()
     indexes = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'index'")}
@@ -475,6 +475,47 @@ def test_a_shard_whose_stored_offsets_are_not_the_running_sum_of_its_lengths_is_
         idx.write_bytes(good)
 
 
+def test_a_store_of_schema_4_is_migrated_with_its_trace_rows_in_their_segments_and_its_shards_unchecked(
+        world, tmp_path):
+    """Step 5 (``schema_5.sql``): the segment of every trace row already stored is written and
+    indexed, so the rows of a document in one segment are found without the other segments'
+    (docs/store.md); no shard already in the store has a record of a check, since nothing says
+    its files were read as the token reader reads them; and the rows a call reads are the same."""
+    store = world.store
+    assert store.shard_files_state(world.shard) == "passed"  # registered by this version
+    path = world.folder / "evidence.db"
+    store.close()
+    raw = sqlite3.connect(path)
+    raw.execute("PRAGMA foreign_keys = OFF")
+    # the store as schema 4 left it
+    raw.execute("DROP INDEX trace_row_segment_document")
+    raw.execute("ALTER TABLE trace_row DROP COLUMN segment_id")
+    raw.execute("DROP TABLE shard_files_check")
+    raw.execute("UPDATE meta SET value = '4' WHERE key = 'schema_version'")
+    raw.execute("INSERT INTO run (run_id, name) VALUES (1, 'probe')")
+    for segment_id in (1, 2):
+        raw.execute("INSERT INTO run_segment (segment_id, run_id, name, position, start_kind, trace_route) "
+                    "VALUES (?, 1, ?, ?, 'fresh', 'cache files')", (segment_id, f"probe/seg-{segment_id}", segment_id))
+    for trace_id, segment_id in ((1, 1), (2, 2), (3, 1)):
+        raw.execute("INSERT INTO step_trace (trace_id, segment_id, step, consumed_samples) VALUES (?, ?, ?, 1)",
+                    (trace_id, segment_id, trace_id))
+        raw.execute("INSERT INTO trace_sample (trace_id, sample_pos, global_index, rank, sample_tokens, "
+                    "covered_tokens) VALUES (?, 0, 0, 0, 8, 8)", (trace_id,))
+        raw.execute("INSERT INTO trace_row VALUES (?, 0, 0, 0, 5, 0, 5)", (trace_id,))
+    raw.commit()
+    raw.close()
+
+    with Store.open(path) as migrated:
+        assert migrated.schema_version == 5
+        assert migrated.shard_files_state(world.shard) is None
+        rows = migrated._conn.execute("SELECT trace_id, segment_id FROM trace_row ORDER BY trace_id").fetchall()
+        assert [tuple(r) for r in rows] == [(1, 1), (2, 2), (3, 1)]
+        indexes = {r[0] for r in migrated._conn.execute("SELECT name FROM sqlite_master WHERE type = 'index'")}
+        assert "trace_row_segment_document" in indexes
+        assert [h.step for h in migrated.trace_hits("probe/seg-1", 0, 5)] == [1, 3]
+        assert [h.step for h in migrated.trace_hits("probe/seg-2", 0, 5)] == [2]
+
+
 def test_the_command_line_migrates_a_version_1_store_that_every_reading_command_refuses(tmp_path):
     """A command that reads a store opens it read-only, so it cannot run a step;
     it refuses by name and names the command that can (plan 3.4)."""
@@ -499,8 +540,8 @@ def test_the_command_line_migrates_a_version_1_store_that_every_reading_command_
     code, printed = run("check")
     assert code == errors.EXIT_REFUSED and "waterwhite migrate" in printed["detail"]
     code, said = run("migrate")
-    assert code == 0 and (said["schema_version_found"], said["schema_version"], said["steps_run"]) == (1, 4, 3)
+    assert code == 0 and (said["schema_version_found"], said["schema_version"], said["steps_run"]) == (1, 5, 4)
     assert said["migrated"]["from"] == 1 and "compare-hand-off" in said["migrated"]["note"]
-    assert run("migrate") == (0, {"schema_version_found": 4, "schema_version": 4, "steps_run": 0})
+    assert run("migrate") == (0, {"schema_version_found": 5, "schema_version": 5, "steps_run": 0})
     code, printed = run("check")
     assert code == 0 and printed["check"] == "passed"
