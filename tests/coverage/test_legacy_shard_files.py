@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import sqlite3
 import struct
 from pathlib import Path
@@ -29,6 +30,9 @@ import ww_world
 
 from waterwhite import cli, coverage, errors, ids, requests
 from waterwhite.store import Store, artifact_files
+
+not_as_root = pytest.mark.skipif(
+    os.geteuid() == 0, reason="root writes a file and a folder that are read-only, so there is no refusal to see")
 
 
 def forget_checks(world) -> None:
@@ -150,6 +154,60 @@ def test_the_check_command_refuses_a_store_of_an_earlier_schema_and_does_not_mig
     raw.commit()
     raw.close()
     world.store = Store.open(world.path)
+
+
+@not_as_root
+def test_a_read_command_on_a_store_in_a_folder_that_cannot_be_written_says_why_and_names_the_way_out(world):
+    """A store file in write-ahead mode that lies in a folder the user cannot write cannot be read by
+    the commands that only read it (SQLite has to make a small file beside it). It said "holds no store:
+    attempt to write a readonly database" (exit 2), which names the wrong cause. The exit code stays; the
+    message names the cause and two ways out, and both work: a copy in a writable folder is read, and
+    ``check`` reads the store where it lies."""
+    import shutil
+    import stat
+
+    world.store.close()
+    folder = world.folder
+    copy = folder / "readable-copy.db"
+    shutil.copy2(world.path, copy)
+    saved = {path: stat.S_IMODE(os.stat(path).st_mode) for path in (folder, world.path)}
+    os.chmod(world.path, 0o444)
+    os.chmod(folder, 0o555)
+    try:
+        out, err = io.StringIO(), io.StringIO()
+        code = cli.main(["query", "withdraw", "C", "--store", str(world.path)], stdout=out, stderr=err)
+        said = json.loads(err.getvalue())
+        assert (code, out.getvalue()) == (errors.EXIT_REFUSED, ""), said
+        assert said["error"] == "not a store", said
+        for words in ("cannot be read where it lies", "folder cannot be written", "Copy the store", "waterwhite check"):
+            assert words in said["detail"], (words, said["detail"])
+        assert "holds no store" not in said["detail"], said["detail"]
+        out, err = io.StringIO(), io.StringIO()
+        assert cli.main(["check", "--store", str(world.path)], stdout=out, stderr=err) == 0, err.getvalue()
+    finally:
+        for path, mode in saved.items():
+            os.chmod(path, mode)
+    out, err = io.StringIO(), io.StringIO()
+    assert cli.main(["query", "withdraw", "C", "--store", str(copy)], stdout=out, stderr=err) == 0, err.getvalue()
+    world.store = Store.open(world.path)
+
+
+@not_as_root
+def test_a_file_that_is_not_a_store_in_a_folder_that_cannot_be_written_is_still_said_to_hold_no_store(tmp_path):
+    import stat
+
+    plain = tmp_path / "plain.db"
+    plain.write_text("this is not a database file\n" * 10, encoding="utf-8")
+    saved = {path: stat.S_IMODE(os.stat(path).st_mode) for path in (tmp_path, plain)}
+    os.chmod(plain, 0o444)
+    os.chmod(tmp_path, 0o555)
+    try:
+        with pytest.raises(errors.NotAStore) as raised:
+            Store.open(plain, readonly=True)
+    finally:
+        for path, mode in saved.items():
+            os.chmod(path, mode)
+    assert "cannot be read where it lies" not in raised.value.detail, raised.value.detail
 
 
 def cli_run(world, *argv: str) -> tuple[int, str, str]:
@@ -322,6 +380,7 @@ def test_the_documents_of_an_archived_unchecked_shard_that_answers_contains_are_
         world.store.close()
 
 
+@not_as_root
 def test_check_gives_its_verdict_on_a_store_it_cannot_write_and_says_nothing_was_recorded(world):
     """Decided after a read of the schema-5 change: ``check`` never fails only because the write is refused. On a store
     file the user cannot write it reads the shards, says what it found, and says that nothing
@@ -349,6 +408,7 @@ def test_check_gives_its_verdict_on_a_store_it_cannot_write_and_says_nothing_was
     assert world.store.shard_files_state(world["shard-1"]) is None  # and nothing was written
 
 
+@not_as_root
 def test_check_does_not_read_a_store_it_cannot_write_as_it_is_when_a_write_ahead_log_lies_beside_it(world):
     """A read of the fallback: an immutable read ignores a ``-wal`` file, and docs/store.md says
     that file belongs to the store; a store in a folder the user cannot write with a log beside it

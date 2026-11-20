@@ -95,6 +95,9 @@ _SOURCE_LINK_DERIVATIONS = (v.DERIVED_POINTER, v.DERIVED_FILE, v.DERIVED_NONE)
 _TRACE_CAUSES = frozenset(v.TRACE_CAUSES)
 _TRACE_MISSING_REASONS = frozenset(v.TRACE_MISSING_STORED_REASONS)
 _CACHE_KINDS = v.CACHE_KINDS_PER_SHARD + v.CACHE_KINDS_PER_BLEND
+# What SQLite says when a store in write-ahead mode is read in a folder that cannot be written: the
+# reader has to make a small file beside the store and cannot.
+_CANNOT_WRITE_BESIDE = "attempt to write a readonly database"
 
 
 # --- Small checks (no store, no disk) ------------------------------------------------
@@ -518,6 +521,14 @@ class Store(IntegrityMixin):
             try:
                 row = conn.execute("SELECT value FROM meta WHERE key = 'schema_version'").fetchone()
             except sqlite3.DatabaseError as exc:
+                if readonly and str(exc) == _CANNOT_WRITE_BESIDE and not os.access(target.parent, os.W_OK):
+                    raise NotAStore(
+                        f"{target} cannot be read where it lies: its folder cannot be written, and a store "
+                        "in write-ahead mode needs a small file made beside it to be read. Copy the store "
+                        "to a folder you can write and open the copy, or use `waterwhite check` on it, "
+                        "which reads it as it is",
+                        path=str(target),
+                    ) from exc
                 raise NotAStore(f"{target} holds no store: {exc}", path=str(target)) from exc
             if row is None:
                 raise NotAStore(f"{target} holds no schema version", path=str(target))

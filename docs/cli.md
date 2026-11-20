@@ -47,6 +47,9 @@ The program is installed as `waterwhite`. It also runs as
   store (no file, a file that is not an SQLite file, a file with no schema of
   this tool) is refused with "not a store"; a store written by a newer build
   with "store of a newer schema version". Both exit with 2. No file is made.
+  A store in a folder the user cannot write is refused by those four commands too, with "not a store"
+  (exit 2) and a detail that says its folder cannot be written and names the two ways out: copy the store to
+  a folder that can be written, or run `check`, which reads it where it lies (below).
 - `recover` writes to the store. With `--dry-run` it opens the store read-only,
   prints its result and writes nothing.
 
