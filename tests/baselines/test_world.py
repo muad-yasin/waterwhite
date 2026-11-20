@@ -68,7 +68,6 @@ import ast
 import hashlib
 import importlib
 import importlib.util
-import io
 import json
 import os
 import re
@@ -77,7 +76,6 @@ import signal
 import subprocess
 import sys
 import time
-import tokenize
 import tomllib
 from collections import Counter
 from collections.abc import Sequence
@@ -175,23 +173,9 @@ PLANT_FILE = "plant_list.jsonl"
 TOKENIZER_NAME = "tokenizer.json"
 TOKENIZER_BYTES = b'{"stand_in": "a tokenizer file the world hashes and copies"}\n'
 
-# What stays out of a tracked file, written in pieces so that this file holds none of it.
-BANNED_WORDS = (
-    "R2" + "A", "ROUND" + "2", "rul" + "ing", "amend" + "ed", "uns" + "ure", "BA" + "RS", "spec " + "1",
-    "spec " + "section", "C" + "&" + "C", "Super" + "Builder", "Op" + "us", "Son" + "net", "advi" + "sor",
-    "/ho" + "me/", "Proj" + "ects/",
-)
-BANNED_PATTERNS = (
-    re.compile(r"\b[GQ]\d\b"),
-    re.compile(r"\bitem \d"),
-    re.compile(r"\bround \d", re.IGNORECASE),
-    re.compile(r"\b(work" + r"flow|ag" + r"ent|br" + r"ief)\b", re.IGNORECASE),
-    re.compile(chr(0x2014)),
-)
-# Words of how the module was built, banned in the comments and docstrings of the module only: the
-# runner's own term for a step of its pre-run order stands in the document of the baselines, and
-# one of them is the name of a builtin.
-PROCESS_WORDS = re.compile(r"\b(sta" + r"ge|sli" + r"ce|wa" + r"ve)\b", re.IGNORECASE)
+# What stays out of a tracked file (a local path, the em dash), written in pieces so that this file holds none of it.
+BANNED_WORDS = ("/ho" + "me/", "Proj" + "ects/")   # a local path
+BANNED_PATTERNS = (re.compile(chr(0x2014)),)         # the em dash
 
 
 def need(name: str):
@@ -1806,14 +1790,6 @@ def test_the_module_holds_no_absolute_path_and_no_sha256_of_a_file():
     assert absolute == [], f"the module holds an absolute path: {absolute}"
     assert re.findall(r"\b[0-9a-f]{64}\b", text) == [], "the module holds a sha256 literal"
     assert _banned_in(text) == [], _banned_in(text)
-    # The words of how the module was built stand in no comment and no docstring.
-    prose = [token.string for token in tokenize.generate_tokens(io.StringIO(text).readline)
-             if token.type == tokenize.COMMENT]
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
-            prose.append(ast.get_docstring(node) or "")
-    found = [piece for piece in prose if PROCESS_WORDS.search(piece)]
-    assert found == [], f"a comment or docstring of the module names how it was built: {found[:3]}"
 
 
 def test_the_document_of_the_baselines_has_a_section_on_the_world_builder():

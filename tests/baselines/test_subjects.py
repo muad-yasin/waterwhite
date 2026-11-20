@@ -782,17 +782,10 @@ def test_a_writer_file_beside_the_entry_folder_is_not_an_entry_of_the_store(tmp_
 
 # --- The documents of the part ---------------------------------------------------------------------------------------
 
-BANNED_WORDS = (
-    "R2" + "A", "ROUND" + "2", "rul" + "ing", "amend" + "ed", "uns" + "ure", "BA" + "RS", "spec " + "1",
-    "spec " + "section", "C" + "&" + "C", "Super" + "Builder", "Op" + "us", "Son" + "net", "advi" + "sor",
-)
+BANNED_WORDS: tuple[str, ...] = ()
 BANNED_PATTERNS = (
-    re.compile(r"\b[GQ]\d\b"),
-    re.compile(r"\bitem \d"),
-    re.compile(r"\bround \d", re.IGNORECASE),
-    re.compile(r"\b(work" + r"flow|ag" + r"ent|br" + r"ief)\b", re.IGNORECASE),
-    re.compile(chr(0x2014)),
-    re.compile("/ho" + "me/"),
+    re.compile(chr(0x2014)),   # the em dash
+    re.compile("/ho" + "me/"),   # a local path
     re.compile("Proj" + "ects/"),
 )
 

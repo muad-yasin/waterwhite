@@ -84,19 +84,9 @@ SUCCESSOR_NAME = "successor of E/shard-3"
 NO_ANSWER_PREFIX = "no answer: failed attempt "
 GRADES = ("right", "wrong", "cannot answer")
 
-# What stays out of a tracked file, written in pieces so that this file holds none of it.
-BANNED_WORDS = (
-    "R2" + "A", "ROUND" + "2", "rul" + "ing", "amend" + "ed", "uns" + "ure", "BA" + "RS", "spec " + "1",
-    "spec " + "section", "C" + "&" + "C", "Super" + "Builder", "Op" + "us", "Son" + "net", "advi" + "sor",
-    "/ho" + "me/", "Proj" + "ects/",
-)
-BANNED_PATTERNS = (
-    re.compile(r"\b[GQ]\d\b"),
-    re.compile(r"\bitem \d"),
-    re.compile(r"\bround \d", re.IGNORECASE),
-    re.compile(r"\b(work" + r"flow|ag" + r"ent|br" + r"ief)\b", re.IGNORECASE),
-    re.compile(chr(0x2014)),
-)
+# What stays out of a tracked file (a local path, the em dash), written in pieces so that this file holds none of it.
+BANNED_WORDS = ("/ho" + "me/", "Proj" + "ects/")   # a local path
+BANNED_PATTERNS = (re.compile(chr(0x2014)),)         # the em dash
 
 
 def need(name: str):

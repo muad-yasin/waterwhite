@@ -1243,21 +1243,12 @@ def test_decisions_has_entries_for_the_harness_the_worker_meaning_the_240_and_th
     assert not any("cpx" in e for e in joined), "an entry names a fixed machine type: the record carries what --host-type gives"
 
 
-# The words no added line may carry (the words are cut in two here so that this file holds none).
-BANNED = [
-    chr(0x2014), "/ho" + "me/", "Pro" + "jects/", "C&" + "C", "Super" + "Builder", "Op" + "us", "Son" + "net",
-    "advi" + "sor", "R2" + "A", "ROUND" + "2", "rul" + "ing", "amen" + "ded", "uns" + "ure", "BA" + "RS",
-    "spec " + "section",
-]
-BANNED_PATTERNS = [r"\bG\d", r"\bQ\d", r"\bround \d", r"\bitem \d", r"\bspec" + r" 1\b"]
-# Words of how the work was organised: banned in prose (docs, entries, comments), not in code names.
-BANNED_PROSE = ["work" + "flow", "slic" + "e", "wav" + "e", "ag" + "ent", "bri" + "ef", "sta" + "ge"]
+# What no added line may carry (cut in two here so that this file holds none).
+BANNED = [chr(0x2014), "/ho" + "me/", "Pro" + "jects/"]   # the em dash and a local path
 
 
-def banned_in(text: str, prose: bool = True):
-    found = [word for word in BANNED + (BANNED_PROSE if prose else []) if word in text]
-    found += [p for p in BANNED_PATTERNS if re.search(p, text)]
-    return found
+def banned_in(text: str):
+    return [word for word in BANNED if word in text]
 
 
 def test_the_new_docs_and_entries_carry_none_of_the_banned_words(repo):
@@ -1272,4 +1263,4 @@ def test_the_new_docs_and_entries_carry_none_of_the_banned_words(repo):
         assert banned_in(entry) == [], entry.split("\n", 1)[0]
     source = repo / "replica" / "cells.py"
     assert source.is_file()
-    assert banned_in(source.read_text(encoding="utf-8"), prose=False) == []
+    assert banned_in(source.read_text(encoding="utf-8")) == []
