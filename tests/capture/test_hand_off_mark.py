@@ -545,7 +545,7 @@ def test_a_migration_that_stops_in_a_later_step_still_names_what_the_earlier_ste
 
 def test_a_migration_that_is_killed_in_a_later_step_does_not_lose_the_sentence_of_the_earlier_one(
         tmp_path, monkeypatch):
-    """Ruling of the lead: each committed step's note is recorded in that step's own transaction.
+    """Ruled on the audit of a078390: each committed step's note is recorded in that step's own transaction.
     A process killed in step 5 (here an interrupt, which is no database error and is not caught)
     leaves step 4 committed and its sentence recorded; the next run that finishes names it."""
     from waterwhite.store import _migrate

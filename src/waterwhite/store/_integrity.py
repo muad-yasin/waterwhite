@@ -73,6 +73,7 @@ from ..errors import (
     MapCountMismatch,
     MapDigestMismatch,
     StoredDigestMismatch,
+    TraceRowSegmentMismatch,
     TraceSampleCountMismatch,
 )
 from . import artifact_files
@@ -236,6 +237,22 @@ class IntegrityMixin(ReadMixin):
         if all(have):
             return FILE_PRESENT
         return FILE_PARTIAL if any(have) else FILE_ABSENT
+
+    def check_trace_row_segments(self) -> None:
+        """One statement over the trace rows: every row's stored segment is the segment of its trace
+        (``TraceRowSegmentMismatch`` names the first that is not). Run by ``check`` alone, not by
+        ``check_integrity``, which a query runs: it reads every trace row of the store."""
+        row = self._conn.execute(
+            "SELECT r.trace_id, r.sample_pos, r.row_pos, r.segment_id, t.segment_id, t.step, s.name "
+            "FROM trace_row r JOIN step_trace t ON t.trace_id = r.trace_id "
+            "LEFT JOIN run_segment s ON s.segment_id = t.segment_id "
+            "WHERE r.segment_id IS NOT t.segment_id ORDER BY r.trace_id, r.sample_pos, r.row_pos LIMIT 1"
+        ).fetchone()
+        if row is not None:
+            raise TraceRowSegmentMismatch(
+                f"a trace row of step {row[5]} of {row[6]} (trace {row[0]}, sample {row[1]}, row {row[2]}) "
+                f"stores the segment {row[3]!r}, and its trace belongs to segment {row[4]}",
+                trace=row[0], sample=row[1], row=row[2], stored=row[3], segment=row[6], step=row[5])
 
     def missing_files(
         self, instance_ids: Iterable[str] | None = None, *, models: bool = False

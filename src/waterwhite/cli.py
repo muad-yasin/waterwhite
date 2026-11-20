@@ -505,6 +505,7 @@ def _check(args: argparse.Namespace) -> tuple[dict, str]:
             writable = False  # the write was refused (a writer holds the lock): the verdict is still given
             found, written = store.recheck_shard_files(record=False)
         store.check_integrity(None)
+        store.check_trace_row_segments()  # one statement over the trace rows; no query runs it
         files = {"present": "present", "absent": "away", "partial": "partial"}
 
         def state_of(shard) -> str:

@@ -161,6 +161,13 @@ class MapCountMismatch(IntegrityFault):
     name = "map count mismatch"
 
 
+class TraceRowSegmentMismatch(IntegrityFault):
+    """A trace row whose stored segment (schema 5) is not the segment of its own trace. The statement
+    that finds it is run by ``check`` and by nothing that answers a query."""
+
+    name = "trace row segment mismatch"
+
+
 class ShardFilesNotChecked(IntegrityFault):
     """A negative answer rests on the map of a shard whose files are not at their recorded
     place, and no check of those files has passed: the store holds none (a shard registered

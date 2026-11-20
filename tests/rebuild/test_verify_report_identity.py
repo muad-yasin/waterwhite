@@ -191,7 +191,7 @@ def test_a_successor_of_another_kind_is_not_read_as_the_file_the_repaired_side_n
         "successor successor of shard-3: kind shard, but the artifact it replaces is of kind jsonl"]
 
 
-# --- The check the lead asked for on the rewrite exemption ------------------------------------
+# --- The rewrite exemption: a mixture row named for a shard ------------------------------------
 
 
 def test_a_rewrite_row_named_for_a_shard_whose_instance_and_kind_are_a_mixture_never_holds(repair_world):

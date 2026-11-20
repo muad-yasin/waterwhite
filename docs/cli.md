@@ -455,7 +455,7 @@ waterwhite check --store FILE
 Runs the loud checks over the whole store: a map or occurrence record whose count
 or digest does not match its artifact, an edge whose parent is gone, a trace whose
 sample count differs from its step's batch size, an artifact whose file no longer
-has the registered digest. The first fault found exits with code 3 and its name.
+has the registered digest, and (after those, in a stage no query runs) a trace row whose stored segment is not the segment of its own trace ("trace row segment mismatch"). The first fault found exits with code 3 and its name.
 
 With no fault it prints
 `{"check": "passed", "artifacts": <n>, "missing_files": [...], "shards_not_passed": [...]}`.

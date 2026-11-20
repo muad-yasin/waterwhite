@@ -409,6 +409,19 @@ def test_check_passes_on_a_whole_store(world):
                                "shards_not_passed": [], "shard_records": "unchanged"}
 
 
+def test_check_names_a_trace_row_whose_segment_is_not_its_traces_segment(world):
+    """Ruled on the audit of a078390: one statement in the stage only ``check`` runs
+    finds every trace row whose stored segment (schema 5) is not the segment of its trace; a query
+    runs no such statement. One row is edited, and check names it."""
+    trace = world.trace_id("E/seg-1", 1)
+    world.sql(("UPDATE trace_row SET segment_id = NULL WHERE trace_id = ? AND sample_pos = 0 AND row_pos = 0",
+               (trace,)))
+    code, out, err = run(world, "check")
+    said = json.loads(err)
+    assert (code, out, said["error"]) == (3, "", "trace row segment mismatch"), err
+    assert said["context"]["trace"] == trace and said["context"]["segment"] == "E/seg-1" and said["context"]["step"] == 1
+
+
 def test_show_says_what_the_store_holds(world):
     code, out, _ = run(world, "show", "mix-2")
     shown = json.loads(out)

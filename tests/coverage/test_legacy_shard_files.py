@@ -244,7 +244,7 @@ def withheld_names(document: dict) -> set[str]:
 
 
 def test_a_listing_withholds_only_the_answers_that_rest_on_an_archived_unchecked_shard(world):
-    """Ruling of the lead on the audit of a078390: one archived shard no longer stops the whole
+    """Ruled on the audit of a078390: one archived shard no longer stops the whole
     listing. The answers that rest on it are named, each with its reason, the others are
     printed as before, and the command still does not exit 0 (3, the fault's own code)."""
     code, out, err = cli_run(world, "query", "withdraw", "C")
@@ -323,7 +323,7 @@ def test_the_documents_of_an_archived_unchecked_shard_that_answers_contains_are_
 
 
 def test_check_gives_its_verdict_on_a_store_it_cannot_write_and_says_nothing_was_recorded(world):
-    """Ruling of the lead: ``check`` never fails only because the write is refused. On a store
+    """Ruled on the audit of a078390: ``check`` never fails only because the write is refused. On a store
     file the user cannot write it reads the shards, says what it found, and says that nothing
     was recorded (a legacy shard read as passed stays unchecked in the store)."""
     import os

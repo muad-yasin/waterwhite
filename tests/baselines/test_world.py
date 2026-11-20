@@ -10,11 +10,11 @@ or is a named input of the command line.
 The module does not exist when these tests are written, so each test asks for it with ``need`` or
 ``need_attr`` in its own body, before anything is built: a missing module is a failed assertion.
 The worlds are built once for the whole file by the real command with the real builders at the
-smallest size (the small set): one with ``--jobs 1`` and one with ``--jobs 4``, and on a machine
-with 24 GB of memory and eight cores or more a third with one worker for each core (at most
-sixteen), all at the same time so that the machine is used; a smaller machine builds ``--jobs 1``
-and then ``--jobs 2``, one after the other, because its memory does not hold the tokenizers of
-several worlds. Every test that reads a world reads one of those folders.
+smallest size (the small set): one with ``--jobs 2`` and one with ``--jobs 4`` (the count of the
+worlds of record), and on a machine with 24 GB of memory and eight cores or more a third with one
+worker for each core (at most sixteen), all at the same time so that the machine is used; a smaller
+machine builds ``--jobs 2`` and then ``--jobs 4``, one after the other, because its memory does not
+hold the tokenizers of several worlds. No world is built with one worker. Every test that reads a world reads one of those folders.
 
 The names this file asks of ``baselines.world``:
 
@@ -52,7 +52,7 @@ What a world folder holds (the shapes below are what these tests read):
   ``state_traces`` with the four starting states of Check 2 as keys.
 - A build made without capture draws its shuffles from the operating system's randomness
   (``replica/fixture.py``, ``replica/build.py``): the path of every file of such a build
-  carries the words ``no-capture``. The seeded files of two worlds (one worker and several) have
+  carries the words ``no-capture``. The seeded files of two worlds (two workers and four) have
   the same sha256; the three chunk files of that build hold the same lines over the shards
   together in any order (the read is set down before the tests of those files); every other
   file of that build has the same sha256. The sha256 of every file of one world is in
@@ -95,13 +95,14 @@ MEGATRON_VARIABLE = "WATERWHITE_MEGATRON_ENV"
 BUILD_SECONDS = 3000.0
 # A machine with this much memory and at least eight cores builds all the worlds at the same time,
 # the last of them with one worker for each core (at most sixteen), so that it is used and not left
-# idle; a smaller machine (a laptop under a memory cap) builds the one-worker world and then a
+# idle; a smaller machine (a laptop under a memory cap) builds a world with two workers and then a
 # world with four workers (the count of the worlds of record), one after the other, because several worlds with their
-# tokenizers do not fit in its memory.
+# tokenizers do not fit in its memory. No world is built with one worker (the owner's rule, 20 Nov 2026).
 BIG_MEMORY_BYTES = 24 * 2**30
 BIG_CORES = 8
 MOST_WORKERS = 16
 SEVERAL_WORKERS_SMALL = 4   # the worker count of the worlds of record (the passes are built with --jobs 4): compared, not only exercised
+FEWER_WORKERS = 2           # the other count compared: fewer workers than the record's, so it holds in the memory the four hold
 
 
 def _memory_limit() -> int:
@@ -130,11 +131,12 @@ def _plan() -> tuple[tuple[int, ...], bool]:
     """The worker counts of the worlds this machine builds, and whether they are built together."""
     cores = len(os.sched_getaffinity(0))
     if _memory_limit() >= BIG_MEMORY_BYTES and cores >= BIG_CORES:
-        return (1, 4, min(cores, MOST_WORKERS)), True
-    return (1, SEVERAL_WORKERS_SMALL), False
+        return (FEWER_WORKERS, SEVERAL_WORKERS_SMALL, min(cores, MOST_WORKERS)), True
+    return (FEWER_WORKERS, SEVERAL_WORKERS_SMALL), False
 
 
 WORLDS, TOGETHER = _plan()
+FEWER = WORLDS[0]
 SEVERAL = WORLDS[1]
 COMMIT = "0123456789abcdef0123456789abcdef01234567"
 ANY_SHA256 = "0" * 64
@@ -287,7 +289,7 @@ def _world_argv(directory: Path, megatron: str, tokenizer: Path, jobs: int) -> l
 
 
 def _build_worlds(factory) -> dict:
-    """Build the worlds of ``WORLDS`` (one worker, several, and on a big machine one for each
+    """Build the worlds of ``WORLDS`` (fewer workers, the record's count, and on a big machine one for each
     core): all at the same time where the machine holds them, else one after the other. Keep what
     each left. A build that runs over the limit is stopped by its own process group id."""
     root = os.environ.get(MEGATRON_VARIABLE, "")
@@ -1015,24 +1017,24 @@ def _tie_seeded(directory: Path):
             sorted(name for name in entries if "no-capture" in name))
 
 
-# The worker counts compared. The world of one worker is the first; every other world of ``WORLDS``
+# The worker counts compared. The world of the fewer workers (two) is the first; every other world of ``WORLDS``
 # is held to it. On a machine under 24 GB of memory or under eight cores that is one other world,
-# built with two workers after the first; on a big machine it is four workers and one for each core.
-# Each count is in the id of the test (for example ``[2-workers]``) and in its failure text.
+# built with four workers after the first; on a big machine it is four workers and one for each core.
+# Each count is in the id of the test (for example ``[4-workers]``) and in its failure text.
 MORE_WORKERS = [pytest.param(jobs, id=f"{jobs}-workers") for jobs in WORLDS[1:]]
 
 
 @pytest.mark.parametrize("jobs", MORE_WORKERS)
-def test_the_seeded_files_have_the_same_sha_with_one_worker_and_with_several(tmp_path_factory, jobs):
+def test_the_seeded_files_have_the_same_sha_with_fewer_workers_and_with_more(tmp_path_factory, jobs):
     """Every file the world names, but those of the build made without capture, has the same sha256
-    in the world of one worker and in the world of ``jobs`` workers (two on a small machine). The
+    in the world of the fewer workers and in the world of ``jobs`` workers (four on a small machine). The
     files of the build made without capture are held to their own bar in the next tests: their
     shuffles come from the operating system's randomness."""
-    one = _built(tmp_path_factory, 1)
+    one = _built(tmp_path_factory, FEWER)
     first = _listed(one)
     more = _built(tmp_path_factory, jobs)
     second = _listed(more)
-    counts = f"1 and {jobs} workers (the worlds of this machine: {list(WORLDS)})"
+    counts = f"{FEWER} and {jobs} workers (the worlds of this machine: {list(WORLDS)})"
     assert [path for path, _ in first] == [path for path, _ in second], \
         f"the worlds of {counts} do not list the same paths"
     differ = []
@@ -1172,10 +1174,10 @@ def _no_capture_differences(left: Path, right: Path, shards: Sequence[str], othe
 
 
 @pytest.mark.parametrize("jobs", MORE_WORKERS)
-def test_the_files_of_the_build_made_without_capture_hold_the_same_lines_with_one_worker_and_with_several(
+def test_the_files_of_the_build_made_without_capture_hold_the_same_lines_with_fewer_workers_and_with_more(
         tmp_path_factory, jobs):
     """The three chunk files of the store made without capture hold, over the shards together, the
-    same multiset of lines in the world of one worker and in the world of ``jobs`` workers (two on a
+    same multiset of lines in the world of the fewer workers and in the world of ``jobs`` workers (four on a
     small machine), whatever the order. The read that makes this the bar: the unseeded shuffle only
     reorders (replica/steps.py:70-75 and :128-129; the one shuffler is made at replica/build.py:566-571
     and the store is built in the partitioned layout alone, replica/fixture.py:95-96; the sanitizer
@@ -1183,9 +1185,9 @@ def test_the_files_of_the_build_made_without_capture_hold_the_same_lines_with_on
     replica/build.py:625-627). Every other file of that build keeps the bar of the seeded files: the
     same sha256, except the file a chunk file of the set was copied from (``copy_of``, W9, 18 Nov 2026; D-WORLD-8): its bytes are the
     copy's, so it is held to its own copy within its world and is not compared across worlds."""
-    one = _built(tmp_path_factory, 1)
+    one = _built(tmp_path_factory, FEWER)
     more = _built(tmp_path_factory, jobs)
-    counts = f"1 and {jobs} workers (the worlds of this machine: {list(WORLDS)})"
+    counts = f"{FEWER} and {jobs} workers (the worlds of this machine: {list(WORLDS)})"
     assert [path for path, _ in _listed(one)] == [path for path, _ in _listed(more)], \
         f"the worlds of {counts} do not list the same paths"
     shards, others = _no_capture_paths(one)
@@ -2037,9 +2039,10 @@ def test_the_document_and_the_decisions_say_the_unseeded_files_are_compared_orde
     assert order_free.search(body), "D-WORLD-8 does not say order-free"
     for word in ("WORLD.sha256", "refus"):
         assert word in body, f"D-WORLD-8 does not mention {word!r}"
-    # The worker counts compared are stated: the world of one worker and a world of four (the count of the worlds of record,
-    # CNC ruling of 18 Nov 2026; old: two on a small machine).
-    assert re.search(r"one worker", body) and re.search(r"\bfour\b", body), "D-WORLD-8 does not state the worker counts compared"
+    # The worker counts compared are stated: a world of two workers and a world of four (the count of the worlds of record;
+    # the owner's rule of 20 Nov 2026: no world is built with one worker).
+    assert re.search(r"\btwo workers\b", body) and re.search(r"\bfour\b", body), "D-WORLD-8 does not state the worker counts compared"
+    assert not re.search(r"one with one worker|one worker (against|with) four", body), "D-WORLD-8 states a world of one worker among the worlds compared"
     assert "its memory was not measured" in section, "the section of the world builder names no limit of the large-machine branch"
     for number in (5, 8):
         assert _banned_in(blocks[number]) == [], (number, _banned_in(blocks[number]))
