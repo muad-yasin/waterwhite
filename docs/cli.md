@@ -49,7 +49,8 @@ The program is installed as `waterwhite`. It also runs as
   with "store of a newer schema version". Both exit with 2. No file is made.
   A store in a folder the user cannot write is refused by those four commands too, with "not a store"
   (exit 2) and a detail that says its folder cannot be written and names the two ways out: copy the store to
-  a folder that can be written, or run `check`, which reads it where it lies (below).
+  a folder that can be written, or run `check`, which reads it where it lies (below). With a non-empty log
+  file (`-wal`) beside the store and no `-shm` file the detail stays "unable to open database file".
 - `recover` writes to the store. With `--dry-run` it opens the store read-only,
   prints its result and writes nothing.
 
