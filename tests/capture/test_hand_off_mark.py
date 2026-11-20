@@ -502,3 +502,41 @@ def test_compare_hand_off_with_only_some_of_a_logs_texts_leaves_the_mark_off(tmp
         assert mark(w) is True
     finally:
         w.store.close()
+
+
+def test_a_migration_that_stops_in_a_later_step_still_names_what_the_earlier_steps_changed(tmp_path, monkeypatch):
+    """The audit of a078390: the note was made once the last step had run, from the version the
+    store was found at, so a store of schema 3 whose step 5 stopped (the first step whose time
+    grows with the data) kept the change step 4 had committed, every log read as not compared,
+    and neither run said so: the first ended in a traceback and the retry named step 5 only."""
+    from waterwhite.store import _migrate
+
+    w = build(tmp_path)
+    try:
+        register(w, edge_for(w, [Handed(w.ref_a, TEXT_A)]))
+    finally:
+        w.store.close()
+    _step_back_to_version_3(w.db)
+    real = _migrate.STEPS[5]
+
+    def broken(conn):
+        raise sqlite3.OperationalError("database or disk is full")
+
+    monkeypatch.setitem(_migrate.STEPS, 5, broken)
+    out, err = io.StringIO(), io.StringIO()
+    code = cli.main(["migrate", "--store", str(w.db)], stdout=out, stderr=err)
+    said = json.loads(err.getvalue())
+    assert (code, said["error"]) == (errors.EXIT_WRITE_REFUSED, "write refused"), err.getvalue()
+    assert "step 5" in said["detail"] and "version 4" in said["detail"]
+    assert (said["migrated"]["from"], said["migrated"]["to"]) == (3, 4)
+    assert "compare-hand-off" in said["migrated"]["note"] and "waterwhite check" not in said["migrated"]["note"]
+    raw = sqlite3.connect(w.db)
+    assert raw.execute("SELECT value FROM meta WHERE key = 'schema_version'").fetchone()[0] == "4"
+    raw.close()
+    # the retry reaches 5 and says what step 5 changes
+    monkeypatch.setitem(_migrate.STEPS, 5, real)
+    out, err = io.StringIO(), io.StringIO()
+    assert cli.main(["migrate", "--store", str(w.db)], stdout=out, stderr=err) == 0, err.getvalue()
+    said = json.loads(out.getvalue())
+    assert (said["migrated"]["from"], said["migrated"]["to"]) == (4, 5)
+    assert "waterwhite check" in said["migrated"]["note"] and "compare-hand-off" not in said["migrated"]["note"]

@@ -62,16 +62,44 @@ def test_a_report_that_names_one_artifact_twice_is_refused(repair_world):
 
 def test_a_name_that_is_not_the_name_of_the_instance_the_entry_states_is_refused(repair_world, tmp_path):
     """The simpler variant: a kept entry whose name is R2 and whose instance is R1's (two
-    different JSONL artifacts) was accepted; the file the repaired side names for R2 was held
-    against R1's digest."""
+    different JSONL artifacts) was accepted: both sides name R2 by a copy of R1's file, which
+    is the digest the entry's instance is registered with, so the kept entry read "identical"
+    and ``--require-held`` exited 0."""
     report = hand_report(repair_world, [("R1", "keep", None)])
     report["artifacts"][0]["artifact"] = "R2"
-    report_path, sides = r1_files(repair_world, tmp_path, report)
-    code, out, err = run(repair_world, "verify", "--report", str(report_path), "--sides", str(sides),
-                         "--require-held")
+    for side in ("repaired", "reference"):
+        (tmp_path / side).mkdir()
+        (tmp_path / side / "R2.jsonl").write_bytes((repair_world.folder / "R1.jsonl").read_bytes())
+    sides = sides_document({"R2": str(tmp_path / "repaired/R2.jsonl")},
+                           {"R2": str(tmp_path / "reference/R2.jsonl")})
+    code, out, err = run(repair_world, "verify", "--report", str(write_json(tmp_path / "report.json", report)),
+                         "--sides", str(write_json(tmp_path / "sides.json", sides)), "--require-held")
     error = error_of(err)
     assert (code, out, error["error"]) == (REFUSED, "", "request refused"), err
     assert "R2" in error["detail"] and error["context"]["artifact"] == "R2", error
+
+
+def test_an_instance_id_is_not_a_second_name_for_an_artifact_the_report_already_names(repair_world, tmp_path):
+    """The audit of a078390: the store resolves an instance id as it resolves a name, so a
+    second entry that names the mixture by its instance id passed the repeated-name check and
+    the name check. The caches condition is built from the entries by instance, the later one
+    winning, so the keep entry hid the stale caches of the rewritten mixture: an exit 5 became 0.
+    An artifact that has a name is named by it, and an instance has one entry."""
+    mixture = repair_world["mix-2"]
+    report = hand_report(repair_world, [("mix-2", "rewrite", "successor of mix-2"), ("mix-2", "keep", None)])
+    report["artifacts"][1]["artifact"] = mixture
+    code, out, err = run(repair_world, "verify", "--report", str(write_json(tmp_path / "report.json", report)),
+                         "--require-held")
+    error = error_of(err)
+    assert (code, out, error["error"]) == (REFUSED, "", "request refused"), err
+    assert mixture in error["detail"] or "mix-2" in error["detail"], error
+
+
+def test_two_entries_for_one_instance_are_refused_whatever_they_are_named(repair_world, tmp_path):
+    report = hand_report(repair_world, [("R1", "keep", None), ("R2", "keep", None)])
+    report["artifacts"][1]["instance"] = report["artifacts"][0]["instance"]
+    code, out, err = run(repair_world, "verify", "--report", str(write_json(tmp_path / "report.json", report)))
+    assert (code, out, error_of(err)["error"]) == (REFUSED, "", "request refused"), err
 
 
 def test_a_rewritten_entry_whose_name_now_resolves_to_another_instance_still_reads_history_changed(
@@ -99,6 +127,8 @@ BAD_REPORTS = {
     "artifact is a list": lambda r: r["artifacts"][0].__setitem__("artifact", ["R1"]),
     "artifact is a number": lambda r: r["artifacts"][0].__setitem__("artifact", 7),
     "kind is a list": lambda r: r["artifacts"][0].__setitem__("kind", ["jsonl"]),
+    "action is a list": lambda r: r["artifacts"][0].__setitem__("action", ["rewrite"]),
+    "action is a number": lambda r: r["artifacts"][0].__setitem__("action", 7),
     "instance is a list": lambda r: r["artifacts"][0].__setitem__("instance", ["x"]),
     "successor is a number": lambda r: r["artifacts"][0].__setitem__("successor", 7),
     "successor is a list": lambda r: r["artifacts"][0].__setitem__("successor", ["successor of R1"]),
@@ -116,7 +146,13 @@ def test_a_report_field_of_the_wrong_type_is_a_refusal_not_a_crash(repair_world,
     code, out, err = run(repair_world, "verify", "--report", str(report_path), "--sides", str(sides),
                          "--require-held")
     assert (code, out) == (REFUSED, ""), (label, err[-300:])
-    assert error_of(err)["error"] == "request refused", (label, err)
+    error = error_of(err)
+    assert error["error"] == "request refused", (label, err)
+    # the refusal says what is wrong with the value, where the check is of its type (the entry
+    # fields the review's reports gave: the same refusal came before for some of them from
+    # other checks, and a test that only asks for exit 2 would not notice the type check go)
+    if label.split(" is ")[0] in ("artifact", "instance", "kind", "action", "successor"):
+        assert "text" in error["detail"], (label, error)
 
 
 # --- The sides file's paths, where verify reads them ----------------------------------------

@@ -447,6 +447,27 @@ def test_a_shard_whose_bin_is_not_the_size_its_index_gives_is_refused_at_registr
         assert found.document_count is None and "its index gives 8" in found.unreadable
 
 
+def test_an_index_with_a_negative_sequence_length_is_refused_where_the_pair_is_read(world, tmp_path):
+    """The audit of a078390: lengths [2, -1] with offsets [0, 8] and a .bin of one token have a
+    total (2 - 1 = 1 token) equal to the file's size, so the size check passed, and so did the
+    offsets; registration, the map and the check took the pair, and a document of two tokens was
+    read from a file of one. A sequence of fewer than no tokens is no index of this layout."""
+    prefix = tmp_path / "negative"
+    prefix.parent.mkdir(exist_ok=True)
+    Path(f"{prefix}.bin").write_bytes(struct.pack("<1i", 7))
+    index = b"MMIDIDX\x00\x00" + struct.pack("<QBQQ", 1, 4, 2, 3)
+    index += struct.pack("<2i", 2, -1) + struct.pack("<2q", 0, 8) + struct.pack("<3q", 0, 1, 2)
+    Path(f"{prefix}.idx").write_bytes(index)
+    for read in (artifact_files.read_shard_index, artifact_files.read_shard):
+        with pytest.raises(errors.UnsupportedFormat, match="negative"):
+            read(f"{prefix}.idx" if read is artifact_files.read_shard_index else prefix)
+    found = artifact_files.read_shard_once(prefix)
+    assert found.document_count is None and "negative" in found.unreadable
+    with pytest.raises(errors.UnsupportedFormat, match="negative"):
+        world.store.register_shard(prefix, name="negative", step=step("tokenize"), inputs=[world.input])
+    assert world.store.artifact("negative") is None
+
+
 def test_a_shard_whose_stored_offsets_are_not_the_running_sum_of_its_lengths_is_refused(world, tmp_path):
     """The outside review of a011cd5, finding 3. Megatron (core_v0.20.0, indexed_dataset.py:
     ``__getitem__`` reads at ``sequence_pointers[idx]``) reads a document at the stored

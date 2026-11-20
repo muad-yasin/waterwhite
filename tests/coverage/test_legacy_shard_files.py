@@ -149,3 +149,86 @@ def test_the_check_command_refuses_a_store_of_an_earlier_schema_and_does_not_mig
     raw.commit()
     raw.close()
     world.store = Store.open(world.path)
+
+
+def cli_run(world, *argv: str) -> tuple[int, str, str]:
+    world.store.close()
+    out, err = io.StringIO(), io.StringIO()
+    try:
+        code = cli.main([*argv, "--store", str(world.path)], stdout=out, stderr=err)
+    finally:
+        world.store = Store.open(world.path)
+    return code, out.getvalue(), err.getvalue()
+
+
+def test_the_query_through_the_command_line_exits_3_names_the_error_and_prints_no_answer(world):
+    """What docs/cli.md ("check") promises of the refusal: exit 3, the name "shard files not
+    checked", and nothing on standard output."""
+    forget_checks(world)
+    put_away(world)
+    code, out, err = cli_run(world, "query", "withdraw", "C", "--artifact", "shard-1")
+    assert (code, out) == (errors.EXIT_INTEGRITY, "")
+    assert json.loads(err)["error"] == "shard files not checked"
+
+
+def test_check_says_which_shards_are_not_passed_and_whether_their_files_are_away(world):
+    """The audit of a078390: ``check`` printed "passed" for a shard that was never checked or
+    was recorded "failed" and whose files are away, and said nothing of which shards the
+    refusal above is waiting for."""
+    code, out, err = cli_run(world, "check")
+    assert code == 0 and json.loads(out)["shards_not_passed"] == []
+    forget_checks(world)
+    put_away(world)
+    code, out, err = cli_run(world, "check")
+    said = json.loads(out)
+    assert code == 0 and said["check"] == "passed"
+    assert said["shards_not_passed"] == [{"instance": world["shard-1"], "name": "shard-1",
+                                          "state": "unchecked", "files": "away"}]
+    put_back(world)
+    code, out, err = cli_run(world, "check")
+    assert code == 0 and json.loads(out)["shards_not_passed"] == []
+
+
+def test_check_lists_a_failed_shard_whose_files_are_away_and_one_whose_files_are_back_fails_the_check(world):
+    swap_the_offsets(world)
+    forget_checks(world)
+    code, out, err = cli_run(world, "check")  # present: the loud check stops, the record stays
+    assert code == errors.EXIT_INTEGRITY
+    put_away(world)
+    code, out, err = cli_run(world, "check")
+    said = json.loads(out)
+    assert code == 0
+    assert said["shards_not_passed"] == [{"instance": world["shard-1"], "name": "shard-1",
+                                          "state": "failed", "files": "away"}]
+
+
+def test_check_reads_the_shard_files_outside_its_write_transaction_and_writes_nothing_when_nothing_changed(
+        world, monkeypatch):
+    """The audit of a078390: ``check`` held ``BEGIN IMMEDIATE`` while it hashed every shard (a
+    second writer waited out the busy timeout) and wrote a row for every shard on every run (a
+    query in another process then ended with "store written during the query")."""
+    world.store.close()
+    seen = []
+    original = artifact_files.read_shard_once
+
+    def watched(prefix):
+        other = sqlite3.connect(world.path, timeout=0)
+        try:
+            other.execute("BEGIN IMMEDIATE")  # raises "database is locked" while the check holds the write lock
+            other.execute("ROLLBACK")
+            seen.append("free")
+        except sqlite3.OperationalError:
+            seen.append("locked")
+        finally:
+            other.close()
+        return original(prefix)
+
+    monkeypatch.setattr(artifact_files, "read_shard_once", watched)
+    reader = sqlite3.connect(world.path)
+    before = reader.execute("PRAGMA data_version").fetchone()[0]
+    out, err = io.StringIO(), io.StringIO()
+    assert cli.main(["check", "--store", str(world.path)], stdout=out, stderr=err) == 0, err.getvalue()
+    assert seen and set(seen) == {"free"}, seen
+    assert reader.execute("PRAGMA data_version").fetchone()[0] == before  # nothing was committed
+    reader.close()
+    world.store = Store.open(world.path)
