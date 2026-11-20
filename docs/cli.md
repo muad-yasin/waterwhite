@@ -158,7 +158,7 @@ Withdraws a source and answers.
 Before it answers, the query runs the store's loud checks: over the ancestor
 closure of the artifact it asks about, or over the whole store for a listing. A
 fault exits with code 3 and prints no answer. A query about an artifact whose
-closure does not hold the fault still answers; a listing is one answer to every artifact, and stops at the first fault.
+closure does not hold the fault still answers. A listing is one answer to every artifact and stops at the first fault, except for one: an answer that rests on an archived shard no check has passed is withheld, and the rest is printed ("check" below).
 
 One answer:
 
@@ -248,7 +248,7 @@ A loud fault (exit 3) names one of "map count mismatch", "map digest mismatch",
 "edge parent missing", "trace sample count mismatch", "artifact digest mismatch",
 "stored digest mismatch", "locator domain mismatch", "cache digest conflict", "shard files not checked" (a
 negative answer rests on a shard whose files are away and which no check has passed; see `check`). A listing, `report`
-and `verify` stop at the first answer that raises it, as at the first cycle.
+and `verify` do not stop at it (as they do at a cycle): they print the answers they can give, name each answer that rests on an archived shard no check has passed in `withheld` with its reason, and exit with 3.
 
 ## query ban, query flagged
 
@@ -469,15 +469,14 @@ registered digest (each pair once, outside any write transaction), and records f
 what that read found (schema 5): "passed" when the pair is a shard of this layout, with the
 offsets and the `.bin` size its index gives (the reading Megatron and the token reader agree
 on), "failed" when it is not. Only a record that changes is written, so a check that finds
-nothing new writes nothing; a store file that cannot be written ends in "write refused"
-(exit 4). It does so before the loud checks, so the record stays when a fault stops the
+nothing new writes nothing. On a store file it cannot write (a file or folder the user has no write access to, or a writer that holds the lock) it gives its verdict all the same and says so in `shard_records`: "not recorded: the store cannot be written" (the states in `shards_not_passed` are what this read found; nothing was written, so a legacy shard it read as passed stays unchecked in the store); it never fails only because the write is refused. It does so before the loud checks, so the record stays when a fault stops the
 command. A shard registered by this version has "passed" from its registration. A shard of a
-store made before schema 5 has no record until a check has read its files. `shards_not_passed`
-lists every shard whose record is not "passed", each with its `instance`, its `name`, its
+store made before schema 5 has no record until a check has read its files. `shard_records` says
+"recorded", "unchanged" or "not recorded: ...". `shards_not_passed` lists every shard whose record is not "passed", each with its `instance`, its `name`, its
 `state` ("unchecked" or "failed") and whether its `files` are "present", "away" or "partial":
-the shards a negative answer is waiting for. A query whose negative answer rests on the map
+the shards a negative answer is waiting for. A query that names an artifact whose negative answer rests on the map
 of such a shard, with its files not at their place, exits with 3 and the name "shard files
-not checked" and prints no answer. With the files at their place the query's loud checks read
+not checked" and prints no answer. A listing, `report` or `verify` prints what it can: each answer that rests on such a shard is left out and named in `withheld` (`artifact`, `instance`, `kind`, `error`, `shard`, `state`, `reason`; the key is present only when there is one), a shard that answers "contains" is not judged document by document (its report entry is "unresolved", with nothing removed), and the command exits with 3 after printing, with the same error on standard error. With the files at their place the query's loud checks read
 them as before. A shard that "failed" stays failed: the registered digest names those bytes.
 
 ## migrate

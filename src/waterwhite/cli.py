@@ -37,8 +37,8 @@ from typing import TextIO
 from . import capture, coverage, extensions, join, normalise, rebuild, recovery, requests, tokenmap
 from . import listing as listings
 from . import vocabulary as v
-from .errors import (EXIT_OK, InvalidRecord, Refused, StoreWrittenDuringQuery, UnsupportedSelector,
-                     UsageError, WaterwhiteError)
+from .errors import (EXIT_OK, InvalidRecord, NotAStore, Refused, StoreWrittenDuringQuery, UnsupportedSelector,
+                     ShardFilesNotChecked, UsageError, WaterwhiteError, WriteRefused)
 from .records import OccurrenceRef
 from .shipped_joins import SHIPPED_JOINS
 from .store import artifact_files
@@ -359,6 +359,7 @@ def _answer_or_listing(args: argparse.Namespace, build: Callable) -> tuple[dict,
         if args.artifact is None:
             made = listings.listing(store, request)
             out, text = made.to_json(), _listing_text(made.to_json())
+            args.withheld = made.withheld
         else:
             answer = coverage.answer(store, args.artifact, request)
             out, text = answer.to_json(), _answer_text(answer.to_json())
@@ -420,7 +421,8 @@ def _report_withdraw(args: argparse.Namespace) -> tuple[dict, str]:
         request = requests.withdraw(
             store, args.source, members=args.member, records=args.record, selectors=args.selector)
         document = rebuild.build_report(store, request, layouts=layouts, placements=placements)
-        text = _report_text(document)
+        text = "\n".join([_report_text(document), *_withheld_lines(document)])
+        args.withheld = document.get("withheld")
         _unchanged_since(store, mark)
     return document, text
 
@@ -471,14 +473,40 @@ def _compare_hand_off(args: argparse.Namespace) -> tuple[dict, str]:
     return out, _plain(out)
 
 
+def _open_for_check(args: argparse.Namespace) -> tuple[Store, bool]:
+    """The store as ``check`` opens it: for writing, so that it can record what it finds of the
+    shards' files, and without migrating (the command that migrates is ``migrate``). A store it
+    cannot write (a file or a folder the user has no write access to) is opened read-only, and
+    the check says that nothing was recorded; it never fails only because the write is refused."""
+    path = _store_path(args)
+    try:
+        return Store.open(path, migrate_older=False), True
+    except (NotAStore, WriteRefused) as first:
+        for immutable in (False, True):  # a store with no -shm to open (a folder it cannot write) is read as it is
+            try:
+                return Store.open(path, readonly=True, immutable=immutable), False
+            except WaterwhiteError:
+                continue
+        raise first from None
+
+
 def _check(args: argparse.Namespace) -> tuple[dict, str]:
-    # Opened for writing: the check reads the two files of every shard that is at its place and
-    # records what it found (``Store.recheck_shard_files``), before the loud checks run, so that
-    # the result stays when a loud check stops the command.
-    with Store.open(_store_path(args), migrate_older=False) as store:
-        store.recheck_shard_files()
+    # The check reads the two files of every shard that is at its place and records what it found
+    # (``Store.recheck_shard_files``) before the loud checks run, so that the result stays when a
+    # loud check stops the command.
+    store, writable = _open_for_check(args)
+    with store:
+        try:
+            found, written = store.recheck_shard_files(record=writable)
+        except WriteRefused:
+            writable = False  # the write was refused (a writer holds the lock): the verdict is still given
+            found, written = store.recheck_shard_files(record=False)
         store.check_integrity(None)
         files = {"present": "present", "absent": "away", "partial": "partial"}
+
+        def state_of(shard) -> str:
+            return found.get(shard.instance_id) or store.shard_files_state(shard.instance_id) or "unchecked"
+
         out = {
             "check": "passed",
             "artifacts": sum(1 for _ in store.artifacts()),
@@ -489,11 +517,11 @@ def _check(args: argparse.Namespace) -> tuple[dict, str]:
             # the shards a negative answer waits for: none was checked, or the check failed
             "shards_not_passed": [
                 {"instance": shard.instance_id, "name": shard.names[0] if shard.names else shard.instance_id,
-                 "state": store.shard_files_state(shard.instance_id) or "unchecked",
-                 "files": files.get(store.file_state(shard.instance_id), "none")}
-                for shard in store.artifacts(v.KIND_SHARD)
-                if store.shard_files_state(shard.instance_id) != "passed"
+                 "state": state_of(shard), "files": files.get(store.file_state(shard.instance_id), "none")}
+                for shard in store.artifacts(v.KIND_SHARD) if state_of(shard) != "passed"
             ],
+            "shard_records": ("not recorded: the store cannot be written" if not writable
+                              else "recorded" if written else "unchanged"),
         }
     return out, _plain(out)
 
@@ -1168,7 +1196,8 @@ def _verify(args: argparse.Namespace) -> tuple[dict, str]:
         made = verify_sides.verify(
             store, report, sides=sides, base=None if args.sides is None else Path(args.sides).parent,
             mode=args.mode, text_field=args.text_field)
-        text = _verification_text(made)
+        text = "\n".join([_verification_text(made), *_withheld_lines(made)])
+        args.withheld = made.get("withheld")
         _unchanged_since(store, mark)
     if args.require_held:
         args.unmet = _unmet_conditions(made, report, sides_given=args.sides is not None)
@@ -1215,6 +1244,8 @@ def _unmet_conditions(made: dict, report: dict, *, sides_given: bool) -> list[st
             unmet.append(f"successor {name}: kind {entry['kind']}, but the artifact it replaces is of kind {replaced}")
         if not entry["registered"]:
             unmet.append(f"successor {name}: not registered")
+        elif entry["answer"] is None:
+            unmet.append(f"successor {name}: answer withheld")
         elif not v.is_negative_word(entry["answer"]):
             unmet.append(f"successor {name}: {entry['answer']}")
         elif entry["matches_sides"] is False:
@@ -1322,7 +1353,16 @@ def _listing_text(made: dict) -> str:
     lines.append("answers:")
     for answer in made["answers"]:
         lines.append(_answer_text(answer))
+    lines.extend(_withheld_lines(made))
     return "\n".join(lines)
+
+
+def _withheld_lines(made: dict) -> list[str]:
+    """The answers a listing, a report or a verification does not give, one line each."""
+    if not made.get("withheld"):
+        return []
+    return ["withheld (rest on an archived shard no check has passed):"] + [
+        f"  {w['artifact']}: {w['reason']}" for w in made["withheld"]]
 
 
 def _exact_rerun_text(restart: dict) -> list[str]:
@@ -1478,6 +1518,16 @@ def main(argv: Sequence[str] | None = None, *, stdout: TextIO | None = None,
             err.write(json.dumps(payload, ensure_ascii=False, default=str) + "\n")
         return error.exit_code
     out.write(printed + "\n")
+    withheld = getattr(args, "withheld", None)
+    if withheld:
+        # What was printed is all the tool can give; the command still does not exit 0 (the
+        # fault's own code), and says so, as an error, on standard error.
+        said = {"error": ShardFilesNotChecked.name, "withheld": len(withheld),
+                "detail": f"{len(withheld)} answer(s) rest on an archived shard no check has passed "
+                          "and are named in the output as withheld"}
+        err.write(f"error: {said['error']}: {said['detail']}\n" if as_text else
+                  json.dumps(said, ensure_ascii=False) + "\n")
+        return ShardFilesNotChecked.exit_code
     unmet = getattr(args, "unmet", None)
     if unmet:
         err.write(f"not held: {'; '.join(unmet)}\n" if as_text else

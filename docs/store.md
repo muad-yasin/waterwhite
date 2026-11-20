@@ -106,7 +106,7 @@ store.close()                                          # or: with Store.open(...
   state, and a copy of the two files is a consistent copy only when nothing writes
   to the store or checkpoints it from the first byte copied to the last. Closing one
   `Store` handle does not give that: `close` tries to fold the log into the file,
-  and it does so only when no other connection is reading. Another connection can
+  and it does so only for a handle that wrote something, and only when no other connection is reading. Another connection can
   still write or checkpoint between the copy of the file and the copy of its log,
   and a pair copied at two moments can lose records or not open. Two ways are safe:
   - **Quiescence.** Stop every process that has the store open (a pipeline that
@@ -841,7 +841,8 @@ The proof reads these and answers from them. `check_integrity` does not raise:
   as a setting; it is not the default. The exception is a shard (schema 5, DECISIONS.md D-181):
   a negative answer that rests on the map of a shard whose files are not at their place, and
   which no check of its files has passed (a shard of a store made before schema 5, or one
-  whose check failed), is not given: it stops with "shard files not checked", because the
+  whose check failed), is not given: a query that names it stops with "shard files not checked"; a listing, a report and a
+  verification withhold that answer, name it, and exit 3, because the
   offsets in the index of the shard cannot be looked at while the files are away; For a gone file the declared count is
   compared with the store's rows only, and check 8 does not look at it. Rows
   removed from the store together with a lowered count are then not found, for as

@@ -41,7 +41,7 @@ __all__ = ["build_report", "report_without_restarts"]
 def report_without_restarts(store, request: Withdrawal, session, *,
                             layouts: Mapping[str, str] | None = None,
                             placements: Mapping[str, placing.Placement] | None = None,
-                            integrity=None) -> dict:
+                            integrity=None, withheld: list | None = None) -> dict:
     """Every key of the report but ``restarts``, ``exposed_checkpoints`` and
     ``checkpoints_not_covered``. It reads
     through the ``coverage.Session`` it is given and ends with "store written during
@@ -54,9 +54,15 @@ def report_without_restarts(store, request: Withdrawal, session, *,
     ordered = [a for a in store.artifacts() if acting.wanted(a)]
     by_instance = {a.instance_id: a for a in ordered}
 
+    held_back: list = [] if withheld is None else withheld
+
     def answered(artifact):
-        return coverage.answer(store, artifact.instance_id, request,
-                               integrity=integrity, session=session)
+        """The answer, or None when it rests on an archived shard no check has passed (it is
+        then in ``withheld`` and the artifact's entry is unresolved with nothing judged)."""
+        if coverage.shard_withheld(store, artifact, held_back):
+            return None
+        return coverage.answer_or_withheld(store, artifact.instance_id, request, sink=held_back,
+                                           integrity=integrity, session=session)
 
     # The shards first: a mixture takes its action from the shards of its snapshot. The
     # records that return to a release are collected as the entries are made.
@@ -64,15 +70,20 @@ def report_without_restarts(store, request: Withdrawal, session, *,
     shards: dict[str, dict] = {}
     for artifact in ordered:
         if artifact.kind == v.KIND_SHARD:
-            shards[artifact.instance_id] = acting.shard_entry(
-                store, session, artifact, answered(artifact), returning)
+            said = answered(artifact)
+            shards[artifact.instance_id] = (
+                acting.withheld_entry(store, artifact) if said is None
+                else acting.shard_entry(store, session, artifact, said, returning))
 
     entries: list[dict] = []
     listing: list[dict] = []
     for artifact in ordered:
         if artifact.kind == v.KIND_JSONL:
-            entry, records = acting.jsonl_entry(
-                store, session, artifact, answered(artifact), returning)
+            said = answered(artifact)
+            if said is None:
+                entry, records = acting.withheld_entry(store, artifact), []
+            else:
+                entry, records = acting.jsonl_entry(store, session, artifact, said, returning)
             listing.extend(records)
         elif artifact.kind == v.KIND_SHARD:
             entry = shards[artifact.instance_id]
@@ -87,7 +98,9 @@ def report_without_restarts(store, request: Withdrawal, session, *,
                            held_placements, returning)
     for place, artifact in enumerate(ordered):
         if artifact.kind == v.KIND_MIXTURE:
-            entries[place] = acting.mixture_entry(store, artifact, answered(artifact), shards)
+            said = answered(artifact)
+            entries[place] = (acting.withheld_entry(store, artifact) if said is None
+                              else acting.mixture_entry(store, artifact, said, shards))
 
     counting.add_bytes(store, by_instance, entries)
     upstream_files = upstream.upstream_entries(store, request, session, integrity=integrity)
@@ -106,6 +119,8 @@ def report_without_restarts(store, request: Withdrawal, session, *,
             "placements": placed,
         },
     }
+    if withheld is None and held_back:
+        document["withheld"] = [w.to_json() for w in held_back]
     session.ensure_current()
     return document
 
@@ -118,13 +133,15 @@ def build_report(store, request: Withdrawal, *,
     over the whole store; one fault ends the report."""
     integrity = coverage.check_store(store)
     session = coverage.Session(store, request)
+    withheld: list = []
     document = report_without_restarts(
-        store, request, session, layouts=layouts, placements=placements, integrity=integrity)
+        store, request, session, layouts=layouts, placements=placements, integrity=integrity,
+        withheld=withheld)
     session.ensure_current()
     from . import restart_exact, restart_free  # the parts that hold the restart points
 
     entries = {entry["run"]: entry
-               for entry in restart_free.exposure_free_restarts(store, request, session)}
+               for entry in restart_free.exposure_free_restarts(store, request, session, withheld)}
     exact = restart_exact.exact_rerun_of_report(store, document["artifacts"])
     restarts = []
     for run in store.runs():
@@ -136,8 +153,11 @@ def build_report(store, request: Withdrawal, *,
         if entry is not None:
             restarts.append(entry | {"exact_rerun": exact.get(run)})
     document["restarts"] = restarts
-    document["exposed_checkpoints"] = restart_free.exposed_checkpoints(store, request, session)
+    document["exposed_checkpoints"] = restart_free.exposed_checkpoints(
+        store, request, session, withheld)
     document["checkpoints_not_covered"] = restart_free.checkpoints_not_covered(
-        store, request, session)
+        store, request, session, withheld)
+    if withheld:
+        document["withheld"] = [w.to_json() for w in withheld]
     session.ensure_current()
     return document

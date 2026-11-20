@@ -200,12 +200,20 @@ def untraced_steps(store, name: str) -> tuple[tuple[int, str], ...]:
     return tuple(_open_steps(store, _Traces(store), segment, part, part.upto_step)[0])
 
 
+NO_ROWS = "no rows"  # the segment's rows hold no read of a document its traces list
+
+
 def _first_covered_read(store, traces: _Traces, segment: str, document, upto: int,
-                        notes: dict[int, tuple[int, int]]) -> tuple[int, str] | None:
+                        notes: dict[int, tuple[int, int]]) -> tuple[int, str] | str | None:
     """The first step whose trace reads the document inside the covered part of a
     sample, with the basis of that read (plan 2.4). A read of one token counts
-    (Decision 18). A row that lies wholly in an uncovered range is no evidence."""
+    (Decision 18). A row that lies wholly in an uncovered range is no evidence.
+    ``NO_ROWS`` when the document is listed as read (``trace_documents`` goes through the
+    trace of each step) and ``trace_hits`` finds no row of it in the segment: a row that
+    names another segment than its trace's, or none, which is no read in an uncovered range."""
+    seen = False
     for hit in store.trace_hits(segment, document.shard_position, document.ordinal, upto_step=upto):
+        seen = True
         if hit.token_end <= hit.token_start:
             continue  # a row that reads no token
         covered = hit.covered_tokens
@@ -220,7 +228,7 @@ def _first_covered_read(store, traces: _Traces, segment: str, document, upto: in
         offset = traces.row_offset(segment, hit)
         if offset is not None and offset < covered:
             return hit.step, basis
-    return None
+    return None if seen else NO_ROWS
 
 
 def checkpoint_outcome(walk: Session, artifact: Artifact) -> Outcome:
@@ -385,6 +393,18 @@ def checkpoint_outcome(walk: Session, artifact: Artifact) -> Outcome:
             status = walk.document(gate, row)
             if status.verdict == HOLDS:
                 read = _first_covered_read(store, traces, part.segment, document, upto, notes)
+                if read == NO_ROWS:
+                    # The same answer as an ordinal the map does not hold: the step read a
+                    # document and the segment's rows do not hold the read.
+                    first.see(index, at, _RECORD, Failing(
+                        names=v.NAMES_MISSING_ORIGIN, condition=v.CONDITION_A,
+                        artifact=walk.name(entry.shard_instance_id), instance=entry.shard_instance_id,
+                        record=f"D{document.ordinal}", segment=part.segment, step=at,
+                        text=f"step {at} of {part.segment} read document {document.ordinal} of "
+                             f"{walk.name(entry.shard_instance_id)}, and the segment's trace rows "
+                             "hold no read of it",
+                    ))
+                    continue
                 if read is None:
                     continue  # read in an uncovered range only: the step is untraced
                 holds_generation = holds_generation or status.generation

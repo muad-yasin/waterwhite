@@ -87,6 +87,7 @@ check: passed
 artifacts: 2
 missing_files: none
 shards_not_passed: none
+shard_records: unchanged
 ```
 
 ## 4. Ask what a withdrawn record reaches

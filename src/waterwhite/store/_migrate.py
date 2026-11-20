@@ -114,17 +114,40 @@ def apply_step(conn: sqlite3.Connection, version: int) -> None:
     )
 
 
+PENDING_KEY = "migration_unsaid"  # meta: the steps committed by a migration whose note was not given yet
+
+
+def pending_steps(conn: sqlite3.Connection) -> list[int]:
+    """The versions of steps that a migration committed and whose note has not been given:
+    a migration that stopped in a later step (or was killed in it) leaves them."""
+    row = conn.execute("SELECT value FROM meta WHERE key = ?", (PENDING_KEY,)).fetchone()
+    return [int(n) for n in row[0].split(",")] if row and row[0] else []
+
+
 def migrate(conn: sqlite3.Connection, current: int, on_step=None) -> int:
     """Bring a store from ``current`` to ``SCHEMA_VERSION``, one transaction per
-    step. Returns the number of steps run. ``on_step(version)`` is called after each step
-    commits. A step that stops with a database error is rolled back and refused as a write
-    that did not happen (``WriteRefused``), naming the step and the version the store is
-    left at; a step that refuses the store (``CacheDigestConflict``) raises its own error."""
+    step. Returns the number of steps run. ``on_step(version)`` is called for each step that
+    has committed and whose note is not given yet: first the steps an earlier migration
+    committed and stopped after, which it recorded in ``meta`` in the step's own transaction
+    (so a process killed in a later step leaves them), then each step this one commits. The
+    record is cleared once the last step has committed; a process killed between that and the
+    printing of the note loses the note, and nothing else. A step that stops with a database
+    error is rolled back and refused as a write that did not happen (``WriteRefused``),
+    naming the step and the version the store is left at; a step that refuses the store
+    (``CacheDigestConflict``) raises its own error."""
     ran = 0
+    carried = pending_steps(conn)
+    if on_step is not None:
+        for version in carried:
+            on_step(version)
     for version in range(current + 1, SCHEMA_VERSION + 1):
         conn.execute("BEGIN IMMEDIATE")
         try:
             apply_step(conn, version)
+            conn.execute(
+                "INSERT INTO meta (key, value) VALUES (?, ?) "
+                "ON CONFLICT (key) DO UPDATE SET value = value || ',' || excluded.value",
+                (PENDING_KEY, str(version)))
         except BaseException as error:
             conn.execute("ROLLBACK")
             if isinstance(error, sqlite3.Error):
@@ -137,4 +160,8 @@ def migrate(conn: sqlite3.Connection, current: int, on_step=None) -> int:
         ran += 1
         if on_step is not None:
             on_step(version)
+    if pending_steps(conn):
+        conn.execute("BEGIN IMMEDIATE")
+        conn.execute("DELETE FROM meta WHERE key = ?", (PENDING_KEY,))
+        conn.execute("COMMIT")
     return ran

@@ -22,11 +22,12 @@ import io
 import json
 import sqlite3
 import struct
+from pathlib import Path
 
 import pytest
 import ww_world
 
-from waterwhite import cli, coverage, errors, requests
+from waterwhite import cli, coverage, errors, ids, requests
 from waterwhite.store import Store, artifact_files
 
 
@@ -278,21 +279,47 @@ def test_a_report_withholds_the_artifacts_that_rest_on_an_archived_unchecked_sha
     assert entries["shard-1"]["action"] == "unresolved"
 
 
-def test_the_documents_of_an_archived_unchecked_shard_that_answers_contains_are_not_judged(world):
+def swapped_world(tmp_path, monkeypatch):
+    """The world as a011cd5 would have built it for the review's fixture: shard-1's index gives the
+    offsets of its first two sequences the other way round, and the store holds the digests of the
+    file as it is everywhere (the registration of that build did not read the offsets)."""
+    real = ww_world.write_shard
+
+    def swapped(prefix, documents):
+        count, _ = real(prefix, documents)
+        if prefix.name == "shard-1":
+            idx = Path(f"{prefix}.idx")
+            data = bytearray(idx.read_bytes())
+            first = 34 + 4 * count
+            one, two = struct.unpack_from("<2q", data, first)
+            struct.pack_into("<2q", data, first, two, one)
+            idx.write_bytes(bytes(data))
+        return count, ids.shard_digest(ids.file_digest(f"{prefix}.bin"), ids.file_digest(f"{prefix}.idx"))
+
+    with monkeypatch.context() as patched:
+        patched.setattr(ww_world, "write_shard", swapped)
+        patched.setattr(artifact_files, "_check_offsets", lambda *args, **kwargs: None)
+        return ww_world.build(tmp_path)
+
+
+def test_the_documents_of_an_archived_unchecked_shard_that_answers_contains_are_not_judged(tmp_path, monkeypatch):
     """The audit of a078390 (the gate's second finding): a shard that answers "contains" never
     reached the gate, and the report judged each of its documents through a map whose offsets
     nothing could vouch for, here the review's swapped offsets: "remove D0, keep D1" where a
     reader that goes by the index reads the tokens of the other document. The shard is
     withheld, with no document judged."""
-    swap_the_offsets(world)
-    forget_checks(world)
-    put_away(world)
-    code, out, err = cli_run(world, "report", "withdraw", "B")
-    assert code == errors.EXIT_INTEGRITY, err
-    report = json.loads(out)
-    assert "shard-1" in withheld_names(report)
-    entry = next(e for e in report["artifacts"] if e["artifact"] == "shard-1")
-    assert (entry["action"], entry["removed"], entry["documents_in_successor"]) == ("unresolved", [], None)
+    world = swapped_world(tmp_path, monkeypatch)
+    try:
+        forget_checks(world)
+        put_away(world)
+        code, out, err = cli_run(world, "report", "withdraw", "B")
+        assert code == errors.EXIT_INTEGRITY, err
+        report = json.loads(out)
+        assert "shard-1" in withheld_names(report)
+        entry = next(e for e in report["artifacts"] if e["artifact"] == "shard-1")
+        assert (entry["action"], entry["removed"], entry["documents_in_successor"]) == ("unresolved", [], None)
+    finally:
+        world.store.close()
 
 
 def test_check_gives_its_verdict_on_a_store_it_cannot_write_and_says_nothing_was_recorded(world):

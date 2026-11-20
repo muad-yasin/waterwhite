@@ -73,15 +73,21 @@ def unproven_entry(store, run: str) -> dict:
     }
 
 
-def exposure_free_restarts(store, request, session) -> list[dict]:
+def _answer(store, ref, request, session, withheld):
+    """A checkpoint's answer, or None when it rests on an archived shard no check has passed
+    and ``withheld`` (a list) takes it; with no list the fault is raised, as before."""
+    return coverage.answer_or_withheld(store, ref, request, sink=withheld, session=session)
+
+
+def exposure_free_restarts(store, request, session, withheld: list | None = None) -> list[dict]:
     """The ``restarts`` entries of the report, one per run that has registered
     checkpoints, in the order the runs were registered."""
     entries = []
     for run, checkpoints in _runs_with_checkpoints(store):
         qualifying = None
         for checkpoint in checkpoints:
-            answer = coverage.answer(store, _name(checkpoint), request, session=session)
-            if answer.is_negative:
+            answer = _answer(store, _name(checkpoint), request, session, withheld)
+            if answer is not None and answer.is_negative:
                 qualifying = checkpoint
         if qualifying is not None:
             entries.append({
@@ -94,15 +100,15 @@ def exposure_free_restarts(store, request, session) -> list[dict]:
     return entries
 
 
-def exposed_checkpoints(store, request, session) -> list[dict]:
+def exposed_checkpoints(store, request, session, withheld: list | None = None) -> list[dict]:
     """The ``exposed_checkpoints`` entries of the report: every registered
     checkpoint whose answer is that the source is behind it or may be. No count of
     reads is given, since exposure counts belong to an extension that is off."""
     entries = []
     for run, checkpoints in _runs_with_checkpoints(store):
         for checkpoint in checkpoints:
-            answer = coverage.answer(store, _name(checkpoint), request, session=session)
-            if answer.answer not in (v.CONTAINS, v.MAY_CONTAIN):
+            answer = _answer(store, _name(checkpoint), request, session, withheld)
+            if answer is None or answer.answer not in (v.CONTAINS, v.MAY_CONTAIN):
                 continue
             exposure = answer.first_exposure
             entries.append({
@@ -120,7 +126,7 @@ def exposed_checkpoints(store, request, session) -> list[dict]:
     return entries
 
 
-def checkpoints_not_covered(store, request, session) -> list[dict]:
+def checkpoints_not_covered(store, request, session, withheld: list | None = None) -> list[dict]:
     """The ``checkpoints_not_covered`` entries of the report: every registered
     checkpoint whose answer is "not covered", in the order of registration, whether or
     not a run reaches it. A checkpoint can be registered over a segment the store holds
@@ -133,8 +139,8 @@ def checkpoints_not_covered(store, request, session) -> list[dict]:
     neither list, an exposed one in ``exposed_checkpoints``, a "not covered" one here."""
     entries = []
     for artifact in store.artifacts(kind=v.KIND_CHECKPOINT):
-        answer = coverage.answer(store, artifact.instance_id, request, session=session)
-        if answer.answer != v.NOT_COVERED:
+        answer = _answer(store, artifact.instance_id, request, session, withheld)
+        if answer is None or answer.answer != v.NOT_COVERED:
             continue
         checkpoint = store.checkpoint(artifact.instance_id)
         if checkpoint is None:

@@ -55,7 +55,8 @@ def _matches_sides(held, name: str, kind: str, sides: Mapping | None, base) -> b
     return verify_sides.file_digest_of(held.kind, verify_sides.side_path(base, named)) == held.content_digest
 
 
-def check_successors(store, report: Mapping, request, sides: Mapping | None, base) -> tuple[list, list]:
+def check_successors(store, report: Mapping, request, sides: Mapping | None, base,
+                     withheld: list | None = None) -> tuple[list, list]:
     """(the ``successors`` entries, the ``history`` entries), one of each for every
     artifact the report rewrites, in the order of the report."""
     session = coverage.Session(store, request)
@@ -73,22 +74,43 @@ def check_successors(store, report: Mapping, request, sides: Mapping | None, bas
                 "holds_unresolved": None, "matches_sides": None, "answered": None,
             })
         else:
-            answered = coverage.answer(store, successor_name, request, session=session)
-            successors.append({
-                "artifact": name, "successor": successor_name, "kind": held.kind,
-                "registered": True, "instance": held.instance_id,
-                "answer": answered.answer, "names": answered.names,
-                "holds_unresolved": _holds_unresolved(store, session, held.instance_id),
-                "matches_sides": _matches_sides(held, name, entry["kind"], sides, base),
-                "answered": answered.to_json(),
-            })
+            # A successor that is, or holds, a shard whose files are away and which no check has
+            # passed is not asked: its answer, and the judgement of its documents, would rest on a
+            # map whose offsets nothing can vouch for (coverage.Withheld).
+            shards = [held] if held.kind == v.KIND_SHARD else [
+                store.artifact(entry.shard_instance_id) for entry in store.mixture_shards(held.instance_id)
+            ] if held.kind == v.KIND_MIXTURE else []
+            blocked = ([] if withheld is None else
+                       [s for s in shards if s is not None and coverage.shard_withheld(store, s, withheld)])
+            answered = None
+            if not blocked:
+                answered = coverage.answer_or_withheld(store, successor_name, request, sink=withheld,
+                                                       session=session)
+            if answered is None and withheld is not None:
+                coverage.withhold_named(store, successor_name, blocked[0] if blocked else None, withheld)
+                successors.append({
+                    "artifact": name, "successor": successor_name, "kind": held.kind,
+                    "registered": True, "instance": held.instance_id,
+                    "answer": None, "names": None,
+                    "holds_unresolved": None, "matches_sides": _matches_sides(held, name, entry["kind"], sides, base),
+                    "answered": None,
+                })
+            else:
+                successors.append({
+                    "artifact": name, "successor": successor_name, "kind": held.kind,
+                    "registered": True, "instance": held.instance_id,
+                    "answer": answered.answer, "names": answered.names,
+                    "holds_unresolved": _holds_unresolved(store, session, held.instance_id),
+                    "matches_sides": _matches_sides(held, name, entry["kind"], sides, base),
+                    "answered": answered.to_json(),
+                })
         historical = store.resolve(name)
-        said = coverage.answer(store, name, request, session=session)
+        said = coverage.answer_or_withheld(store, name, request, sink=withheld, session=session)
         history.append({
             "artifact": name,
             "instance": None if historical is None else historical.instance_id,
             "instance_unchanged": historical is not None and historical.instance_id == entry["instance"],
-            "answer": said.answer,
+            "answer": None if said is None else said.answer,
         })
     return successors, history
 

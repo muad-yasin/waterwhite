@@ -32,6 +32,7 @@ docs/coverage.md states the rules as built.
 from __future__ import annotations
 
 import weakref
+from dataclasses import dataclass
 from collections.abc import Callable, Iterable
 
 from .. import extensions
@@ -39,11 +40,11 @@ from .. import vocabulary as v
 from ..answers import Answer, Finding, Proof, Scope, claim_proof_mint
 from ..errors import Refused, ShardFilesNotChecked, TemporalAncestryCycle, UnsupportedSelector
 from ..requests import Withdrawal
-from ..store.views import Artifact
+from ..store.views import FILE_ABSENT, Artifact
 from ._walk import CLEAR, HOLDS, MAY, NOT_COVERED, Outcome, Session
 
-__all__ = ["IntegrityPass", "Session", "answer", "check_store", "is_clear", "model_not_covered", "prove",
-           "untraced_steps"]
+__all__ = ["IntegrityPass", "Session", "Withheld", "answer", "answer_or_withheld", "check_store", "is_clear",
+           "model_not_covered", "prove", "shard_withheld", "untraced_steps", "withhold_named"]
 
 
 def is_clear(verdict) -> bool:
@@ -205,6 +206,18 @@ def _conclude(mint, walk: Session, artifact: Artifact, outcome: Outcome) -> Proo
     )
 
 
+def _fault(instance: str, path: str, state: str | None) -> ShardFilesNotChecked:
+    where = f"the files of shard {instance} are not at {path}"
+    if state == "failed":
+        detail = (f"{where}, and when they were last checked they were not a shard of this "
+                  "layout (the offsets or the size of its index): the negative is not given")
+    else:
+        detail = (f"{where}, and no check of them has passed (the store registered the shard "
+                  "before its offsets and size were held to the token reader): the negative is "
+                  "not given until the files are put back and `waterwhite check` has read them")
+    return ShardFilesNotChecked(detail, instance=instance, path=path, state=state)
+
+
 def _require_shard_files_checked(store, missing) -> None:
     """The negative is not given while a shard of the closure is without its files and no
     check of them has passed (``ShardFilesNotChecked``): none was made, or it failed."""
@@ -214,16 +227,7 @@ def _require_shard_files_checked(store, missing) -> None:
         state = store.shard_files_state(lacking.instance_id)
         if state == "passed":
             continue
-        where = f"the files of shard {lacking.instance_id} are not at {lacking.path}"
-        if state == "failed":
-            detail = (f"{where}, and when they were last checked they were not a shard of this "
-                      "layout (the offsets or the size of its index): the negative is not given")
-        else:
-            detail = (f"{where}, and no check of them has passed (the store registered the shard "
-                      "before its offsets and size were held to the token reader): the negative is "
-                      "not given until the files are put back and `waterwhite check` has read them")
-        raise ShardFilesNotChecked(
-            detail, instance=lacking.instance_id, path=lacking.path, state=state)
+        raise _fault(lacking.instance_id, lacking.path, state)
 
 
 def _missing_files(walk: Session, artifact: Artifact):
@@ -325,3 +329,83 @@ def answer(
     shown = artifact if artifact in found.names else (found.names[0] if found.names else found.instance_id)
     result = prove(store, found, request, integrity=integrity, session=session)
     return Answer.from_result(result, artifact=shown)
+
+
+@dataclass(frozen=True)
+class Withheld:
+    """An answer the tool does not give because it rests on a shard whose files are away and
+    which no check has passed (``ShardFilesNotChecked``): the artifact it was asked of, the
+    shard, and why. A listing, a report and a verification print these beside the answers they
+    do give (docs/cli.md, "check")."""
+
+    artifact: str
+    instance: str
+    kind: str
+    shard: str
+    state: str | None
+    reason: str
+    error: str = ShardFilesNotChecked.name
+
+    def to_json(self) -> dict:
+        return {"artifact": self.artifact, "instance": self.instance, "kind": self.kind,
+                "error": self.error, "shard": self.shard, "state": self.state, "reason": self.reason}
+
+
+def _put(sink: list, item: Withheld) -> None:
+    """One entry for an artifact, however many answers of the command ask for it."""
+    if not any(held.instance == item.instance and held.artifact == item.artifact for held in sink):
+        sink.append(item)
+
+
+def _withheld(store, ref, error: ShardFilesNotChecked) -> Withheld:
+    found = store.resolve(ref) if isinstance(ref, str) else ref
+    shown = ref if found is None else (found.names[0] if found.names else found.instance_id)
+    return Withheld(
+        artifact=shown if isinstance(shown, str) else str(shown),
+        instance="" if found is None else found.instance_id,
+        kind="" if found is None else found.kind,
+        shard=error.context.get("instance", ""), state=error.context.get("state"), reason=error.detail)
+
+
+def answer_or_withheld(store, artifact: str, request: Withdrawal, *, sink: list | None,
+                       integrity: IntegrityPass | None = None, session: Session | None = None):
+    """``answer``, except that an answer that rests on an archived shard no check has passed
+    is put in ``sink`` as a ``Withheld`` and ``None`` is returned: the caller goes on with the
+    answers it can give and says which it cannot. With no ``sink`` the fault is raised, as
+    ``answer`` raises it (a query that names the artifact)."""
+    if sink is None:
+        return answer(store, artifact, request, integrity=integrity, session=session)
+    try:
+        return answer(store, artifact, request, integrity=integrity, session=session)
+    except ShardFilesNotChecked as error:
+        _put(sink, _withheld(store, artifact, error))
+        return None
+
+
+def withhold_named(store, ref, shard: Artifact | None, sink: list) -> None:
+    """Put the artifact named ``ref`` in ``sink``, withheld for ``shard`` (the shard whose
+    files are away) when the caller found it before asking the question."""
+    if shard is None:
+        return  # the question itself raised, and answer_or_withheld has put it in the sink
+    path = store.disk_path(shard.instance_id)
+    found = store.resolve(ref)
+    _put(sink, Withheld(
+        artifact=ref, instance="" if found is None else found.instance_id,
+        kind="" if found is None else found.kind, shard=shard.instance_id,
+        state=store.shard_files_state(shard.instance_id),
+        reason=_fault(shard.instance_id, str(path), store.shard_files_state(shard.instance_id)).detail))
+
+
+def shard_withheld(store, shard: Artifact, sink: list | None) -> bool:
+    """Whether the shard's own files are away and no check has passed. Its documents are then
+    not judged through its map (a "keep" or a "remove" of a document rests on offsets nothing can
+    vouch for while the files are away); with a ``sink`` the shard is put in it."""
+    if shard.kind != v.KIND_SHARD or store.file_state(shard.instance_id) != FILE_ABSENT:
+        return False
+    state = store.shard_files_state(shard.instance_id)
+    if state == "passed":
+        return False
+    if sink is not None:
+        path = store.disk_path(shard.instance_id)
+        _put(sink, _withheld(store, shard, _fault(shard.instance_id, str(path), state)))
+    return True

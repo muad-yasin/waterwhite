@@ -56,6 +56,9 @@ def _check_sides_paths(document: Mapping) -> None:
         if not isinstance(side, Mapping):
             continue
         for artifact, named in side.items():
+            _clean(artifact, f"a name on the {which} side of the sides file", side=which)
+            if isinstance(named, str):
+                _clean(named, f"the path of {artifact} on its {which} side", side=which, artifact=artifact)
             if not isinstance(named, str):
                 raise Refused(
                     f"the sides file names {artifact} on its {which} side by something that is "
@@ -69,6 +72,25 @@ def _check_sides_paths(document: Mapping) -> None:
 def _need(condition: bool, detail: str, **context: object) -> None:
     if not condition:
         raise Refused(detail, **context)
+
+
+def _carries(text: str) -> bool:
+    """Whether a text can be a name or a path and be bound to a query: no NUL (a path lookup
+    ends in ValueError on one) and no unpaired surrogate (it cannot be encoded)."""
+    if "\x00" in text:
+        return False
+    try:
+        text.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True
+
+
+def _clean(value: object, what: str, **context: object) -> None:
+    """Refuse a text that holds a character a name or a path cannot hold."""
+    if isinstance(value, str):
+        _need(_carries(value), f"{what} holds a NUL or an unpaired surrogate, which no name or path holds",
+              **context)
 
 
 def report_artifacts(report: Mapping) -> list[dict]:
@@ -89,6 +111,8 @@ def report_artifacts(report: Mapping) -> list[dict]:
         _need(entry["successor"] is None or isinstance(entry["successor"], str),
               f"the report gives {entry['artifact']} a successor that is not text: "
               f"{json.dumps(entry['successor'])}", artifact=entry["artifact"])
+        for key in ("artifact", "instance", "kind", "action", "successor"):
+            _clean(entry[key], f"the {key} of an entry of the report's artifacts")
         _need(entry["action"] in _ARTIFACT_ACTIONS,
               f"the report gives {entry['artifact']} the action {entry['action']!r}")
         # An entry is one entry for one artifact: the gate and the comparison are keyed by the
@@ -165,11 +189,14 @@ def report_request(store, report: Mapping):
           "the report holds no request that names a source")
     _need(held.get("kind", requests.KIND_WITHDRAW) == requests.KIND_WITHDRAW,
           "the report is for a request this build does not answer")
+    _clean(held["source"], "the source of the report's request")
     for key in ("members", "records"):
         listed = held.get(key)
         _need(listed is None or (isinstance(listed, list) and all(isinstance(n, str) for n in listed)),
               f"the report's request gives {key} as something that is not a list of text: "
               f"{json.dumps(listed)}")
+        for member in listed or ():
+            _clean(member, f"a {key[:-1]} of the report's request")
     return requests.withdraw(
         store, held["source"], members=held.get("members") or (), records=held.get("records") or ())
 
@@ -518,10 +545,11 @@ def verify(store, report: Mapping, *, sides: Mapping | None = None, base=None,
             continue
         kept.append(_kept_entry(store, entry, repaired_side, base))
 
-    successors, history = verify_successors.check_successors(store, report, request, sides, base)
+    held_back: list = []
+    successors, history = verify_successors.check_successors(store, report, request, sides, base, held_back)
     caches = verify_caches.check_caches(store, report)
     restarts = restart_exact.exact_rerun_restarts(store, report, caches)
-    return {
+    made = {
         "form": v.FORM_VERIFICATION,
         "request": request.to_json(),
         "mode": mode,
@@ -539,6 +567,9 @@ def verify(store, report: Mapping, *, sides: Mapping | None = None, base=None,
         "caches": caches,
         "restarts": restarts,
     }
+    if held_back:
+        made["withheld"] = [w.to_json() for w in held_back]
+    return made
 
 
 def _kept_entry(store, entry: dict, repaired_side: Mapping, base) -> dict:

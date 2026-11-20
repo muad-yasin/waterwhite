@@ -107,14 +107,18 @@ class Listing:
     covers: dict[str, tuple[str, ...]]
     answers: tuple[Answer, ...]
     not_covered: tuple[NotCovered, ...]
+    withheld: tuple = ()  # the answers that rest on an archived shard no check has passed
 
     def to_json(self) -> dict:
-        return {
+        made = {
             "request": self.request.to_json(),
             "covers": {key: list(self.covers[key]) for key in COVERS_KEYS},
             "answers": [a.to_json() for a in self.answers],
             "not_covered": [n.to_json() for n in self.not_covered],
         }
+        if self.withheld:
+            made["withheld"] = [w.to_json() for w in self.withheld]
+        return made
 
 
 def _shown(artifact: Artifact) -> str:
@@ -233,15 +237,20 @@ def listing(store, request: Withdrawal) -> Listing:
     # ``not_covered`` too (a query that names it gives the same answer). With the switch on this build holds the off
     # state only, so the listing is refused with the error of its query: a listing
     # passes no registered artifact over.
-    def answer_for(artifact: Artifact) -> Answer:
+    withheld: list = []
+
+    def answer_for(artifact: Artifact) -> Answer | None:
         if artifact.kind == v.KIND_PUBLISHED_MODEL and models_off:
             return coverage.model_not_covered(artifact, _shown(artifact), request)
-        return coverage.answer(store, _shown(artifact), request, integrity=integrity, session=session)
+        return coverage.answer_or_withheld(store, _shown(artifact), request, sink=withheld,
+                                           integrity=integrity, session=session)
 
-    answers = tuple(answer_for(artifact) for kind in asked for artifact in asked[kind])
+    answers = tuple(a for a in (answer_for(artifact) for kind in asked for artifact in asked[kind])
+                    if a is not None)
     return Listing(
         request=request,
         covers={key: tuple(value) for key, value in covers.items()},
         answers=answers,
         not_covered=tuple(gaps),
+        withheld=tuple(withheld),
     )

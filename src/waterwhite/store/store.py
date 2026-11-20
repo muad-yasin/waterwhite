@@ -414,9 +414,12 @@ class Store(IntegrityMixin):
     # ------------------------------------------------------------------------------
 
     @staticmethod
-    def _connect(path: Path, readonly: bool) -> sqlite3.Connection:
+    def _connect(path: Path, readonly: bool, immutable: bool = False) -> sqlite3.Connection:
         if readonly:
-            conn = sqlite3.connect(f"{path.as_uri()}?mode=ro", uri=True, isolation_level=None)
+            # ``immutable``: the file is read as it is, with no -wal or -shm file beside it (a store
+            # in a folder the user cannot write to has none to open); nothing may write it meanwhile.
+            flags = "mode=ro&immutable=1" if immutable else "mode=ro"
+            conn = sqlite3.connect(f"{path.as_uri()}?{flags}", uri=True, isolation_level=None)
         else:
             conn = sqlite3.connect(str(path), isolation_level=None)
         conn.row_factory = sqlite3.Row
@@ -496,7 +499,8 @@ class Store(IntegrityMixin):
         return (found if found is not None else reached), reached
 
     @classmethod
-    def open(cls, path, *, readonly: bool = False, migrate_older: bool = True) -> "Store":
+    def open(cls, path, *, readonly: bool = False, migrate_older: bool = True,
+             immutable: bool = False) -> "Store":
         """Open an existing store. A store of an older schema version is migrated
         step by step first; a read-only open of such a store is refused, and so is a
         writable one made with ``migrate_older=False`` (a command that writes a little and
@@ -507,7 +511,7 @@ class Store(IntegrityMixin):
         if not target.is_file():
             raise NotAStore(f"no file at {target}", path=str(target))
         try:
-            conn = cls._connect(target, readonly)
+            conn = cls._connect(target, readonly, immutable)
         except sqlite3.DatabaseError as exc:
             raise NotAStore(f"{target} cannot be opened as a store: {exc}", path=str(target)) from exc
         try:
@@ -1557,7 +1561,7 @@ class Store(IntegrityMixin):
             (state, instance),
         )
 
-    def recheck_shard_files(self) -> dict[str, int]:
+    def recheck_shard_files(self, *, record: bool = True) -> tuple[dict[str, str], int]:
         """Read the two files of every registered shard that is at its recorded place, and
         record what the read found (``shard_files_check``, schema 5): "passed" when the
         pair is the registered one (its digest is the registered digest) and is a shard of
@@ -1572,9 +1576,12 @@ class Store(IntegrityMixin):
         one read of each file), outside any write transaction, and only the shards whose
         record changes are written, in one short transaction: a check that finds nothing new
         writes nothing, so it neither holds the write lock while it hashes nor moves the
-        store under a query that is reading it in another process. Returns how many shards
-        each result was recorded for (the changed ones)."""
-        self._require_writable()
+        store under a query that is reading it in another process. With ``record`` false (a
+        store that cannot be written) nothing is written and the store may be read-only.
+        Returns what each shard read was found to be (instance id to "passed" or "failed")
+        and how many records were written."""
+        if record:
+            self._require_writable()
         found = []
         for row in self._conn.execute(
                 "SELECT instance_id, path, content_digest FROM artifact "
@@ -1588,13 +1595,11 @@ class Store(IntegrityMixin):
                 continue
             found.append((row["instance_id"], "passed" if on_disk.document_count is not None else "failed"))
         changed = [(instance, state) for instance, state in found if self.shard_files_state(instance) != state]
-        done = {"passed": 0, "failed": 0}
-        if changed:
+        if record and changed:
             with self._transaction() as conn:
                 for instance, state in changed:
                     self._mark_shard_files(conn, instance, state)
-                    done[state] += 1
-        return done
+        return dict(found), len(changed) if record else 0
 
     def write_map(
         self,

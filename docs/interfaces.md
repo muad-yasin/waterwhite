@@ -972,7 +972,7 @@ describes every command, flag and output in full.
 | `show <artifact> [--record LOCATOR]` | what the store holds about an artifact or one record of it; runs no loud check | 0; 1; 2; 3 |
 | `show <shard> --map NAMESPACE/DERIVATION [--verification RESULT]` | the rows of one named map of a shard; runs no loud check | 0; 1; 2; 3 |
 | `show <segment> --trace [--step N]` | the rows the join wrote for a registered run segment, in reading order, with its route, cause, the run record's launches (`launches`, as registered) and untraced steps; for a cyclic segment each step also names the epochs it reads in (`epochs`); `--step` keeps one step; runs no loud check | 0; 1; 2; 3 |
-| `check` | run the loud checks over the whole store, after reading the two files of every shard at its place and recording what the read found (it opens the store for writing, and refuses a store that needs a migration step) | 0; 1; 2; 3; 4 |
+| `check` | run the loud checks over the whole store, after reading the two files of every shard at its place and recording what the read found (it opens the store for writing, or read-only when it cannot write, and refuses a store that needs a migration step) | 0; 1; 2; 3 |
 | `report withdraw <source> [--member M ...] [--record ARTIFACT:LOCATOR ...] [--selector KEY=VALUE ...] [--layout NAME=PREFIX ...]` | the rebuild report of a withdrawal (plan 4.1, 4.3): per affected artifact and per record its action and its reason, the counts, the restart points, the checkpoints that carry exposure and the checkpoints that answer "not covered"; computed from the store as it is, writes nothing (section 7.1) | 0; 1; 2; 3 |
 | `report ban <text>`, `report flagged <file>` | requests of two extensions that are off: refused with "extension off" | 1; 2 |
 | `verify --report FILE [--sides FILE] [--mode seeded\|unseeded] [--text-field FIELD]` | the verification of a repair (plan 4.2, 4.4): the repaired side against the reference side, the artifacts the report keeps, the answers for the successors and for the history, the stale caches and the exact-rerun restart; opens the store read-only (sections 7.2 and 7.3) | 0; 1; 2; 3 |
@@ -1490,6 +1490,8 @@ the comparisons of the sides are "not compared" and the rest is made. `--mode` s
 whether every step of the build was seeded and defaults to "unseeded", the weaker
 claim (plan 4.2); `--text-field` is the field of a JSONL line that holds its text
 (default `text`). The command opens the store read-only and writes nothing.
+
+The listing, the report (7.1) and the verification (7.3) carry one more key, `withheld`, only when an answer rests on an archived shard no check has passed (docs/cli.md, "check"): a list of `{artifact, instance, kind, error, shard, state, reason}`; the artifact's entry in the report is "unresolved" with nothing judged, the successor's `answer` is null, and the command exits with 3 after printing.
 
 What `verify` reads of the report: `form`; `request`, which it puts again to the
 store (`source` is text, `members` and `records` lists of text); for each of `artifacts`,

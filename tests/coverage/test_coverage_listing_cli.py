@@ -406,7 +406,7 @@ def test_check_passes_on_a_whole_store(world):
     code, out, err = run(world, "check")
     assert (code, err) == (0, "")
     assert json.loads(out) == {"check": "passed", "artifacts": len(world.ids), "missing_files": [],
-                               "shards_not_passed": []}
+                               "shards_not_passed": [], "shard_records": "unchanged"}
 
 
 def test_show_says_what_the_store_holds(world):

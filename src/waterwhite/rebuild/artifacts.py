@@ -69,6 +69,34 @@ def _entry(artifact, answer) -> dict:
     }
 
 
+class _Withheld:
+    """What an artifact's entry reads of an answer that was not given (``coverage.Withheld``):
+    no answer, no chain."""
+
+    answer = None
+    chain: tuple = ()
+    is_negative = False
+
+
+def withheld_entry(store, artifact) -> dict:
+    """The entry of an artifact whose answer is withheld (it rests on an archived shard no
+    check has passed): unresolved, with nothing judged. The artifact is named in the report's
+    ``withheld`` with the reason."""
+    entry = _entry(artifact, _Withheld())
+    entry["action"] = v.UNRESOLVED
+    if artifact.kind == v.KIND_SHARD:
+        binding = store.binding(artifact.instance_id)
+        entry["documents"] = None if binding is None else binding.declared_count
+        entry["removed"] = []
+        entry["receives"] = []
+    elif artifact.kind == v.KIND_MIXTURE:
+        entry["rewritten_shards"] = []
+        entry["needs_successor"] = False
+    elif artifact.kind == v.KIND_JSONL:
+        entry["records"] = store.occurrence_count(artifact.instance_id)
+    return entry
+
+
 def _record_entry(artifact: str, record: str, judgement) -> dict:
     return {
         "artifact": artifact,
