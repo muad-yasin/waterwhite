@@ -83,7 +83,7 @@ def test_a_trace_row_that_names_an_ordinal_the_map_does_not_hold(world, ask):
 
 
 def test_a_trace_row_whose_segment_is_not_its_traces_segment_is_a_read_the_segment_does_not_hold(world, ask):
-    """The audit of a078390: ``trace_hits`` finds a segment's rows through the segment each row
+    """A read of the schema-5 change: ``trace_hits`` finds a segment's rows through the segment each row
     stores, and the walk lists a segment's documents through the trace of each step. A row
     whose stored segment is empty left the document listed and with no row to read: the read was
     taken for one in an uncovered range, and a checkpoint that had read a withdrawn record

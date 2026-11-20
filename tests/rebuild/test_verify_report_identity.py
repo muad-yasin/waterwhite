@@ -1,4 +1,4 @@
-"""The outside review of 504bf64 (Sol's second review), findings 1 and 3 and the two
+"""The outside review of 504bf64 (its second review), findings 1 and 3 and the two
 corrections that touch ``verify``: what a report must be before ``verify`` reads it.
 
 A report's entries are keyed by artifact name in the gate, so an entry has to be one
@@ -42,7 +42,7 @@ def r1_files(world, tmp_path, report):
 
 
 def test_a_report_that_names_one_artifact_twice_is_refused(repair_world):
-    """Sol's reproduction: the report rewrites shard-3 with a mixture as its successor, then
+    """The reviewer's reproduction: the report rewrites shard-3 with a mixture as its successor, then
     names shard-3 again in a kept entry that points at a real mixture. Each entry passes the
     per-instance kind check; the later one overwrote the earlier in the tables the gate is
     built from, so the shard comparison was skipped and ``--require-held`` exited 0."""
@@ -80,7 +80,7 @@ def test_a_name_that_is_not_the_name_of_the_instance_the_entry_states_is_refused
 
 
 def test_an_instance_id_is_not_a_second_name_for_an_artifact_the_report_already_names(repair_world, tmp_path):
-    """The audit of a078390: the store resolves an instance id as it resolves a name, so a
+    """A read of the schema-5 change: the store resolves an instance id as it resolves a name, so a
     second entry that names the mixture by its instance id passed the repeated-name check and
     the name check. The caches condition is built from the entries by instance, the later one
     winning, so the keep entry hid the stale caches of the rewritten mixture: an exit 5 became 0.
@@ -224,7 +224,7 @@ BAD_TEXT = {
 
 @pytest.mark.parametrize("label", list(BAD_TEXT))
 def test_text_that_cannot_be_a_name_or_a_path_is_a_refusal_not_a_crash(repair_world, tmp_path, label):
-    """The audit of a078390: a NUL ends a path lookup in ValueError and a lone surrogate cannot be
+    """A read of the schema-5 change: a NUL ends a path lookup in ValueError and a lone surrogate cannot be
     bound to a query; the command ended in a traceback where the contract says exit 2."""
     report = hand_report(repair_world, [("R1", "rewrite", "successor of R1")])
     BAD_TEXT[label](report)

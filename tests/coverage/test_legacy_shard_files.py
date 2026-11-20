@@ -1,4 +1,4 @@
-"""The outside review of 504bf64 (Sol's second review): a store made before the offsets of a
+"""The outside review of 504bf64 (its second review): a store made before the offsets of a
 shard's index were held to the token reader gave "does not contain" for a checkpoint whose
 shard files had been moved away, though the offsets stored in the index could name another
 document than the one the map names, and nothing in the store could say whether they did.
@@ -116,7 +116,7 @@ def test_a_legacy_shard_with_its_files_away_gives_no_negative_until_a_check_has_
 
 
 def test_a_legacy_shard_whose_offsets_the_check_finds_wrong_is_refused_for_good(world):
-    """Sol's fixture: swapped offsets. The check with the files present stops with the fault it
+    """The reviewer's fixture: swapped offsets. The check with the files present stops with the fault it
     gave before and records "failed"; the files away again and the answer is refused, naming
     that they were found not to be a shard of this layout, however often it is asked."""
     swap_the_offsets(world)
@@ -173,7 +173,7 @@ def test_the_query_through_the_command_line_exits_3_names_the_error_and_prints_n
 
 
 def test_check_says_which_shards_are_not_passed_and_whether_their_files_are_away(world):
-    """The audit of a078390: ``check`` printed "passed" for a shard that was never checked or
+    """A read of the schema-5 change: ``check`` printed "passed" for a shard that was never checked or
     was recorded "failed" and whose files are away, and said nothing of which shards the
     refusal above is waiting for."""
     code, out, err = cli_run(world, "check")
@@ -206,7 +206,7 @@ def test_check_lists_a_failed_shard_whose_files_are_away(world):
 
 def test_check_reads_the_shard_files_outside_its_write_transaction_and_writes_nothing_when_nothing_changed(
         world, monkeypatch):
-    """The audit of a078390: ``check`` held ``BEGIN IMMEDIATE`` while it hashed every shard (a
+    """A read of the schema-5 change: ``check`` held ``BEGIN IMMEDIATE`` while it hashed every shard (a
     second writer waited out the busy timeout) and wrote a row for every shard on every run (a
     query in another process then ended with "store written during the query")."""
     world.store.close()
@@ -244,7 +244,7 @@ def withheld_names(document: dict) -> set[str]:
 
 
 def test_a_listing_withholds_only_the_answers_that_rest_on_an_archived_unchecked_shard(world):
-    """Ruled on the audit of a078390: one archived shard no longer stops the whole
+    """Decided after a read of the schema-5 change: one archived shard no longer stops the whole
     listing. The answers that rest on it are named, each with its reason, the others are
     printed as before, and the command still does not exit 0 (3, the fault's own code)."""
     code, out, err = cli_run(world, "query", "withdraw", "C")
@@ -303,7 +303,7 @@ def swapped_world(tmp_path, monkeypatch):
 
 
 def test_the_documents_of_an_archived_unchecked_shard_that_answers_contains_are_not_judged(tmp_path, monkeypatch):
-    """The audit of a078390 (the gate's second finding): a shard that answers "contains" never
+    """A read of the schema-5 change (the gate's second finding): a shard that answers "contains" never
     reached the gate, and the report judged each of its documents through a map whose offsets
     nothing could vouch for, here the review's swapped offsets: "remove D0, keep D1" where a
     reader that goes by the index reads the tokens of the other document. The shard is
@@ -323,7 +323,7 @@ def test_the_documents_of_an_archived_unchecked_shard_that_answers_contains_are_
 
 
 def test_check_gives_its_verdict_on_a_store_it_cannot_write_and_says_nothing_was_recorded(world):
-    """Ruled on the audit of a078390: ``check`` never fails only because the write is refused. On a store
+    """Decided after a read of the schema-5 change: ``check`` never fails only because the write is refused. On a store
     file the user cannot write it reads the shards, says what it found, and says that nothing
     was recorded (a legacy shard read as passed stays unchecked in the store)."""
     import os
@@ -350,7 +350,7 @@ def test_check_gives_its_verdict_on_a_store_it_cannot_write_and_says_nothing_was
 
 
 def test_check_does_not_read_a_store_it_cannot_write_as_it_is_when_a_write_ahead_log_lies_beside_it(world):
-    """The audit of the fallback: an immutable read ignores a ``-wal`` file, and docs/store.md says
+    """A read of the fallback: an immutable read ignores a ``-wal`` file, and docs/store.md says
     that file belongs to the store; a store in a folder the user cannot write with a log beside it
     would be read without what the log holds. It is refused (the first open's error), not read."""
     import os

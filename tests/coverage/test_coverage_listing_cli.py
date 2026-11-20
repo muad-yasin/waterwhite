@@ -410,7 +410,7 @@ def test_check_passes_on_a_whole_store(world):
 
 
 def test_check_names_a_trace_row_whose_segment_is_not_its_traces_segment(world):
-    """Ruled on the audit of a078390: one statement in the stage only ``check`` runs
+    """Decided after a read of the schema-5 change: one statement in the stage only ``check`` runs
     finds every trace row whose stored segment (schema 5) is not the segment of its trace; a query
     runs no such statement. One row is edited, and check names it."""
     trace = world.trace_id("E/seg-1", 1)

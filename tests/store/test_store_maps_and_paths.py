@@ -448,7 +448,7 @@ def test_a_shard_whose_bin_is_not_the_size_its_index_gives_is_refused_at_registr
 
 
 def test_an_index_with_a_negative_sequence_length_is_refused_where_the_pair_is_read(world, tmp_path):
-    """The audit of a078390: lengths [2, -1] with offsets [0, 8] and a .bin of one token have a
+    """A read of the schema-5 change: lengths [2, -1] with offsets [0, 8] and a .bin of one token have a
     total (2 - 1 = 1 token) equal to the file's size, so the size check passed, and so did the
     offsets; registration, the map and the check took the pair, and a document of two tokens was
     read from a file of one. A sequence of fewer than no tokens is no index of this layout."""

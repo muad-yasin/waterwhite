@@ -1,4 +1,4 @@
-"""Ruled on the audit of a078390: ``verify`` withholds, as the listing and the report
+"""Decided after a read of the schema-5 change: ``verify`` withholds, as the listing and the report
 do, only the answers that rest on a shard whose files are away and which no check has passed.
 Each is named with its reason in ``withheld``; the rest of the verification is printed; the
 command does not exit 0 (3, the fault's own code)."""

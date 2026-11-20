@@ -505,7 +505,7 @@ def test_compare_hand_off_with_only_some_of_a_logs_texts_leaves_the_mark_off(tmp
 
 
 def test_a_migration_that_stops_in_a_later_step_still_names_what_the_earlier_steps_changed(tmp_path, monkeypatch):
-    """The audit of a078390: the note was made once the last step had run, from the version the
+    """A read of the schema-5 change: the note was made once the last step had run, from the version the
     store was found at, so a store of schema 3 whose step 5 stopped (the first step whose time
     grows with the data) kept the change step 4 had committed, every log read as not compared,
     and neither run said so. A database error is refused naming the step, and the note of the
@@ -545,7 +545,7 @@ def test_a_migration_that_stops_in_a_later_step_still_names_what_the_earlier_ste
 
 def test_a_migration_that_is_killed_in_a_later_step_does_not_lose_the_sentence_of_the_earlier_one(
         tmp_path, monkeypatch):
-    """Ruled on the audit of a078390: each committed step's note is recorded in that step's own transaction.
+    """Decided after a read of the schema-5 change: each committed step's note is recorded in that step's own transaction.
     A process killed in step 5 (here an interrupt, which is no database error and is not caught)
     leaves step 4 committed and its sentence recorded; the next run that finishes names it."""
     from waterwhite.store import _migrate
