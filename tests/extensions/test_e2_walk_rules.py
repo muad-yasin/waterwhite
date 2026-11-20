@@ -280,18 +280,42 @@ def test_a_cycle_met_under_a_records_own_contains_does_not_leak_to_an_output_tha
         "may contain", NOT_REGISTERED, "hosted-model-x")
 
 
-def test_a_model_text_that_overflows_the_parser_is_one_text_that_is_not_registered(world, ask):
+def test_a_model_text_that_the_parser_rejects_is_one_text_that_is_not_registered(world, ask):
     """A model text of 100000 opening brackets is not a list the harness wrote (it cannot be
     parsed), so it reads as one text, as any text that starts with "[" and is not that list does
     (TK-Q7b): not a registered checkpoint, "generating model not registered" naming the text.
-    The parser's recursion limit is no new refusal."""
+    The parser's refusal is no new refusal. How the parser refuses depends on the interpreter and
+    on its stack: a RecursionError where it overflows, a JSONDecodeError where it is deep enough
+    to read as far as the first character that is no value."""
     text = "[" * 100_000
-    # A precondition, not the assertion of this test: the parser overflows on this text here, so
-    # the test pins the guard and not just any text the parser rejects.
-    with pytest.raises(RecursionError):
+    # A precondition, not the assertion of this test: the parser rejects this text, one way or
+    # the other, on every interpreter, so the test pins the guard and not just any text.
+    with pytest.raises((RecursionError, ValueError)):
         json.loads(text)
     kit.set_model(world, "summary", text)
     kit.turn_on(world)
+    shown = kit.summary(ask)
+    assert (shown["answer"], shown.get("names"), kit.link(shown, "artifact")[0]) == (
+        "may contain", NOT_REGISTERED, text)
+
+
+@pytest.mark.parametrize("refusal", [RecursionError("maximum recursion depth exceeded"),
+                                     json.JSONDecodeError("Expecting value", "[", 1)],
+                         ids=["the parser overflows", "the parser stops at a decode error"])
+def test_either_refusal_of_the_parser_makes_the_text_one_text_that_is_not_registered(world, ask, monkeypatch, refusal):
+    """Both ways the parser can refuse a text that starts with "[", put in by hand so that neither
+    depends on how deep this interpreter can go: one text, not a registered checkpoint."""
+    text = "[" * 50
+    real = json.loads
+
+    def loads(value, *args, **kwargs):
+        if value == text:
+            raise refusal
+        return real(value, *args, **kwargs)
+
+    kit.set_model(world, "summary", text)
+    kit.turn_on(world)
+    monkeypatch.setattr(json, "loads", loads)
     shown = kit.summary(ask)
     assert (shown["answer"], shown.get("names"), kit.link(shown, "artifact")[0]) == (
         "may contain", NOT_REGISTERED, text)
